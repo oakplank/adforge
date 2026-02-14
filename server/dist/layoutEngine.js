@@ -1,296 +1,147 @@
-/**
- * Layout Engine - Intelligent layout calculation with design rules
- *
- * Features:
- * - Z-pattern and F-pattern reading flow awareness
- * - WCAG AA contrast checking (4.5:1 ratio)
- * - Dynamic font sizing based on text length
- * - Safe zone enforcement per format
- * - Logo placement rules (top-right or bottom-right, never center)
- * - CTA placement (lower third, centered or right-aligned)
- * - Visual weight balancing
- */
-import { FORMAT_CONFIGS } from './promptEngine.js';
-// WCAG AA contrast ratio requirement
+// Layout Engine - Text positioning, contrast checking, and visual layout
 export const WCAG_AA_RATIO = 4.5;
 export const SAFE_ZONES = {
-    square: { top: 80, right: 40, bottom: 100, left: 40 },
-    portrait: { top: 100, right: 40, bottom: 140, left: 40 },
-    story: { top: 120, right: 40, bottom: 200, left: 40 },
+    square: { top: 0.20, bottom: 0.25 },
+    portrait: { top: 0.20, bottom: 0.25 },
+    story: { top: 0.20, bottom: 0.30 },
 };
 export const FONT_SIZES = {
-    headline: { min: 24, max: 48, default: 36 },
-    subhead: { min: 14, max: 24, default: 18 },
-    cta: { min: 12, max: 20, default: 16 },
+    headline: { min: 24, max: 72, default: 48 },
+    subhead: { min: 16, max: 36, default: 24 },
+    cta: { min: 14, max: 28, default: 20 },
 };
-/**
- * Calculate relative luminance for contrast calculation
- * WCAG 2.0 formula
- */
-function getLuminance(hex) {
-    // Remove # if present
-    const hexClean = hex.replace('#', '');
-    // Parse RGB
-    const r = parseInt(hexClean.substring(0, 2), 16) / 255;
-    const g = parseInt(hexClean.substring(2, 4), 16) / 255;
-    const b = parseInt(hexClean.substring(4, 6), 16) / 255;
-    // Convert to linear RGB
-    const toLinear = (c) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-    const rLinear = toLinear(r);
-    const gLinear = toLinear(g);
-    const bLinear = toLinear(b);
-    // Calculate luminance
-    return 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
+const FORMAT_DIMENSIONS = {
+    square: { width: 1080, height: 1080 },
+    portrait: { width: 1080, height: 1350 },
+    story: { width: 1080, height: 1920 },
+};
+function hexToRgb(hex) {
+    const h = hex.replace('#', '');
+    return [
+        parseInt(h.substring(0, 2), 16),
+        parseInt(h.substring(2, 4), 16),
+        parseInt(h.substring(4, 6), 16),
+    ];
 }
-/**
- * Calculate contrast ratio between two colors
- * WCAG 2.0 formula
- */
+function relativeLuminance(hex) {
+    const [r, g, b] = hexToRgb(hex).map((c) => {
+        const s = c / 255;
+        return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
 export function calculateContrastRatio(color1, color2) {
-    const L1 = getLuminance(color1);
-    const L2 = getLuminance(color2);
-    const lighter = Math.max(L1, L2);
-    const darker = Math.min(L1, L2);
+    const l1 = relativeLuminance(color1);
+    const l2 = relativeLuminance(color2);
+    const lighter = Math.max(l1, l2);
+    const darker = Math.min(l1, l2);
     return (lighter + 0.05) / (darker + 0.05);
 }
-/**
- * Check if contrast ratio meets WCAG AA
- */
 export function meetsContrastRequirement(color1, color2) {
     return calculateContrastRatio(color1, color2) >= WCAG_AA_RATIO;
 }
-/**
- * Find a text color that meets contrast requirements against a background
- */
-export function findAccessibleTextColor(backgroundColor, preferredColor = '#FFFFFF') {
-    // Check if preferred color works
-    if (meetsContrastRequirement(backgroundColor, preferredColor)) {
-        return {
-            color: preferredColor,
-            ratio: calculateContrastRatio(backgroundColor, preferredColor),
-        };
+export function findAccessibleTextColor(bgColor, preferred) {
+    if (preferred) {
+        const ratio = calculateContrastRatio(preferred, bgColor);
+        if (ratio >= WCAG_AA_RATIO)
+            return { color: preferred, ratio };
     }
-    // Try white and black
-    const white = '#FFFFFF';
-    const black = '#000000';
-    const whiteRatio = calculateContrastRatio(backgroundColor, white);
-    const blackRatio = calculateContrastRatio(backgroundColor, black);
-    if (whiteRatio >= WCAG_AA_RATIO && whiteRatio >= blackRatio) {
-        return { color: white, ratio: whiteRatio };
-    }
-    if (blackRatio >= WCAG_AA_RATIO) {
-        return { color: black, ratio: blackRatio };
-    }
-    // Neither meets requirements, return the better one
+    const whiteRatio = calculateContrastRatio('#FFFFFF', bgColor);
+    const blackRatio = calculateContrastRatio('#000000', bgColor);
     return whiteRatio >= blackRatio
-        ? { color: white, ratio: whiteRatio }
-        : { color: black, ratio: blackRatio };
+        ? { color: '#FFFFFF', ratio: whiteRatio }
+        : { color: '#000000', ratio: blackRatio };
 }
-/**
- * Calculate dynamic font size based on text length
- */
-export function calculateFontSize(text, config, maxWidth) {
-    const charCount = text.length;
-    // Estimate character width (rough approximation)
-    // Average character width is about 0.5 * fontSize for most fonts
-    const estimatedCharWidth = config.default * 0.5;
-    const estimatedWidth = charCount * estimatedCharWidth;
-    if (estimatedWidth <= maxWidth) {
-        return config.default;
-    }
-    // Scale down to fit
-    const scaleFactor = maxWidth / estimatedWidth;
-    const newSize = Math.floor(config.default * scaleFactor);
-    // Clamp to min/max
-    return Math.max(config.min, Math.min(config.max, newSize));
+export function calculateFontSize(text, config, containerWidth) {
+    const charWidth = 0.6; // approximate ratio
+    const idealSize = containerWidth / (text.length * charWidth);
+    return Math.min(config.max, Math.max(config.min, Math.min(config.default, idealSize)));
 }
-/**
- * Determine reading pattern based on format and content structure
- */
-function determineReadingPattern(format, hasVisualElement) {
-    // Z-pattern works well for story format with visual hierarchy
-    // F-pattern works well for text-heavy square/portrait ads
-    if (format === 'story') {
-        return 'z-pattern';
-    }
-    return 'f-pattern';
-}
-/**
- * Calculate element position based on reading pattern
- */
-function calculateTextPositions(format, safeZone, width, height, readingPattern) {
-    const contentWidth = width - safeZone.left - safeZone.right;
-    if (readingPattern === 'z-pattern') {
-        // Z-pattern: Top-left → Top-right → Bottom-right
-        return {
-            headline: {
-                x: safeZone.left,
-                y: safeZone.top + 20,
-            },
-            subhead: {
-                x: safeZone.left,
-                y: safeZone.top + 70,
-            },
-            cta: {
-                x: width - safeZone.right - 150, // Right-aligned
-                y: height - safeZone.bottom - 20,
-            },
-        };
-    }
-    else {
-        // F-pattern: Top-left emphasis, vertical scan
-        return {
-            headline: {
-                x: safeZone.left,
-                y: safeZone.top + 20,
-            },
-            subhead: {
-                x: safeZone.left,
-                y: safeZone.top + 70,
-            },
-            cta: {
-                x: safeZone.left + (contentWidth - 120) / 2, // Centered
-                y: height - safeZone.bottom - 20,
-            },
-        };
-    }
-}
-/**
- * Calculate logo position (always top-right or bottom-right, never center)
- */
-function calculateLogoPosition(format, safeZone, width, logoWidth = 80) {
-    // Prefer top-right for most formats
-    return {
-        x: width - safeZone.right - logoWidth,
-        y: safeZone.top,
-    };
-}
-/**
- * Generate complete layout for an ad
- */
-export function generateLayout(format, headline, subhead, cta, backgroundColor, accentColor, hasVisualElement = true) {
-    // Normalize format
-    const adFormat = format === 'story' || format === '9:16'
-        ? 'story'
-        : format === 'portrait' || format === '4:5'
-            ? 'portrait'
-            : 'square';
-    const formatConfig = FORMAT_CONFIGS[adFormat];
-    const safeZone = SAFE_ZONES[adFormat];
-    const width = formatConfig.width;
-    const height = formatConfig.height;
-    // Determine reading pattern
-    const readingPattern = determineReadingPattern(adFormat, hasVisualElement);
-    // Calculate text positions
-    const positions = calculateTextPositions(adFormat, safeZone, width, height, readingPattern);
-    // Calculate content width for font sizing
-    const contentWidth = width - safeZone.left - safeZone.right;
-    // Calculate dynamic font sizes
+export function generateLayout(format, headline, subhead, ctaText, bgColor, accentColor) {
+    const dims = FORMAT_DIMENSIONS[format] || FORMAT_DIMENSIONS.square;
+    const { width, height } = dims;
+    const safeZone = SAFE_ZONES[format] || SAFE_ZONES.square;
+    const safeTop = height * safeZone.top;
+    const safeBottom = height * (1 - safeZone.bottom);
+    const contentWidth = width * 0.8;
+    const contentX = width * 0.1;
+    // Text colors
+    const headlineColor = findAccessibleTextColor(bgColor);
+    const subheadColor = findAccessibleTextColor(bgColor);
+    const ctaColor = findAccessibleTextColor(accentColor);
+    // Font sizes
     const headlineFontSize = calculateFontSize(headline, FONT_SIZES.headline, contentWidth);
     const subheadFontSize = calculateFontSize(subhead, FONT_SIZES.subhead, contentWidth);
-    const ctaFontSize = calculateFontSize(cta, FONT_SIZES.cta, 120); // CTA is usually in a button
-    // Find accessible text colors
-    const headlineColor = findAccessibleTextColor(backgroundColor);
-    const subheadColor = findAccessibleTextColor(backgroundColor);
-    // CTA typically on accent color background
-    const ctaBgColor = accentColor;
-    const ctaTextColor = findAccessibleTextColor(ctaBgColor);
-    // Build element layouts
-    const headlineLayout = {
-        position: positions.headline,
-        fontSize: headlineFontSize,
-        width: contentWidth,
-        height: headlineFontSize * 1.2,
-        alignment: 'left',
-    };
-    const subheadLayout = {
-        position: positions.subhead,
-        fontSize: subheadFontSize,
-        width: contentWidth,
-        height: subheadFontSize * 1.2,
-        alignment: 'left',
-    };
-    const ctaLayout = {
-        position: positions.cta,
-        fontSize: ctaFontSize,
-        width: 120,
-        height: 40,
-        alignment: readingPattern === 'z-pattern' ? 'right' : 'center',
-    };
+    const ctaFontSize = calculateFontSize(ctaText, FONT_SIZES.cta, contentWidth);
+    // Positions - headline in safe zone, subhead below, CTA in lower third
+    const headlineY = safeTop + 20;
+    const subheadY = headlineY + headlineFontSize + 20;
+    const ctaY = height * 0.75; // lower third
+    const readingPattern = format === 'story' ? 'z-pattern' : 'f-pattern';
     return {
-        format: adFormat,
+        format,
         width,
         height,
-        safeZone,
-        headline: headlineLayout,
-        subhead: subheadLayout,
-        cta: ctaLayout,
-        logoPosition: calculateLogoPosition(adFormat, safeZone, width),
+        headline: {
+            text: headline,
+            position: { x: contentX, y: headlineY },
+            fontSize: headlineFontSize,
+            color: headlineColor.color,
+            width: contentWidth,
+            height: headlineFontSize * 1.2,
+        },
+        subhead: {
+            text: subhead,
+            position: { x: contentX, y: subheadY },
+            fontSize: subheadFontSize,
+            color: subheadColor.color,
+            width: contentWidth,
+            height: subheadFontSize * 1.2,
+        },
+        cta: {
+            text: ctaText,
+            position: { x: contentX, y: ctaY },
+            fontSize: ctaFontSize,
+            color: ctaColor.color,
+            width: contentWidth * 0.4,
+            height: ctaFontSize * 2,
+        },
+        logoPosition: { x: width * 0.85, y: height * 0.05 },
         textColors: {
             headline: headlineColor.color,
             subhead: subheadColor.color,
-            cta: ctaTextColor.color,
-            ctaBackground: ctaBgColor,
+            cta: ctaColor.color,
         },
         contrastRatios: {
             headline: headlineColor.ratio,
             subhead: subheadColor.ratio,
-            cta: ctaTextColor.ratio,
+            cta: ctaColor.ratio,
         },
         readingPattern,
     };
 }
-/**
- * Validate layout meets all requirements
- */
 export function validateLayout(layout) {
     const warnings = [];
-    // Check contrast ratios
-    if (layout.contrastRatios.headline < WCAG_AA_RATIO) {
-        warnings.push(`Headline contrast ratio ${layout.contrastRatios.headline.toFixed(2)}:1 is below WCAG AA requirement of ${WCAG_AA_RATIO}:1`);
-    }
-    if (layout.contrastRatios.subhead < WCAG_AA_RATIO) {
-        warnings.push(`Subhead contrast ratio ${layout.contrastRatios.subhead.toFixed(2)}:1 is below WCAG AA requirement of ${WCAG_AA_RATIO}:1`);
-    }
-    if (layout.contrastRatios.cta < WCAG_AA_RATIO) {
-        warnings.push(`CTA contrast ratio ${layout.contrastRatios.cta.toFixed(2)}:1 is below WCAG AA requirement of ${WCAG_AA_RATIO}:1`);
-    }
-    // Check safe zone violations
-    if (layout.headline.position.y < layout.safeZone.top) {
-        warnings.push('Headline position violates top safe zone');
-    }
-    if (layout.cta.position.y + layout.cta.height > layout.height - layout.safeZone.bottom) {
-        warnings.push('CTA position violates bottom safe zone');
-    }
-    return {
-        valid: warnings.length === 0,
-        warnings,
-    };
+    if (layout.contrastRatios.headline < WCAG_AA_RATIO)
+        warnings.push('Headline contrast ratio below WCAG AA');
+    if (layout.contrastRatios.subhead < WCAG_AA_RATIO)
+        warnings.push('Subhead contrast ratio below WCAG AA');
+    if (layout.contrastRatios.cta < WCAG_AA_RATIO)
+        warnings.push('CTA contrast ratio below WCAG AA');
+    return { valid: warnings.length === 0, warnings };
 }
-/**
- * Adjust layout for visual weight balancing
- * If product image is on one side, offset text to the other
- */
-export function balanceVisualWeight(layout, productImagePosition) {
-    if (productImagePosition === 'center') {
-        return layout; // No adjustment needed
+export function balanceVisualWeight(layout, imagePosition) {
+    const result = JSON.parse(JSON.stringify(layout));
+    const shift = layout.width * 0.1;
+    if (imagePosition === 'left') {
+        result.headline.position.x += shift;
+        result.subhead.position.x += shift;
+        result.cta.position.x += shift;
     }
-    const adjusted = { ...layout };
-    const offset = productImagePosition === 'left' ? 100 : -100;
-    // Shift text elements opposite to image position
-    adjusted.headline = {
-        ...layout.headline,
-        position: {
-            x: layout.headline.position.x + offset,
-            y: layout.headline.position.y,
-        },
-    };
-    adjusted.subhead = {
-        ...layout.subhead,
-        position: {
-            x: layout.subhead.position.x + offset,
-            y: layout.subhead.position.y,
-        },
-    };
-    return adjusted;
+    else if (imagePosition === 'right') {
+        result.headline.position.x -= shift;
+        result.subhead.position.x -= shift;
+        result.cta.position.x -= shift;
+    }
+    return result;
 }

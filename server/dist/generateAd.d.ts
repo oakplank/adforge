@@ -1,11 +1,12 @@
 import { Router } from 'express';
-import { ProductCategory, FormatConfig } from './promptEngine.js';
-import { LayoutOutput } from './layoutEngine.js';
-export interface GenerateAdRequest {
-    prompt: string;
-    format?: string;
-    templateId?: string;
-}
+import { type FormatConfig } from './promptEngine.js';
+import { type LayoutOutput } from './layoutEngine.js';
+declare const VIBE_COLOR_MAP: Record<string, {
+    primary: string;
+    secondary: string;
+    accent: string;
+}>;
+declare const COLOR_NAME_MAP: Record<string, string>;
 export interface AdTexts {
     headline: string;
     subhead: string;
@@ -23,7 +24,7 @@ export interface AdSpec {
     texts: AdTexts;
     colors: AdColors;
     templateId: string;
-    category: ProductCategory;
+    category: string;
     layout?: LayoutOutput;
     metadata?: {
         headlineFormula: string;
@@ -42,12 +43,6 @@ interface ParsedPrompt {
     colors: string[];
     rawPrompt: string;
 }
-declare const VIBE_COLOR_MAP: Record<string, {
-    primary: string;
-    secondary: string;
-    accent: string;
-}>;
-declare const COLOR_NAME_MAP: Record<string, string>;
 export declare function parsePrompt(prompt: string): ParsedPrompt;
 export declare function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId?: string): AdSpec;
 export declare function createGenerateAdRouter(): Router;

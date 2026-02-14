@@ -1,25 +1,19 @@
-/**
- * Layout Engine - Intelligent layout calculation with design rules
- *
- * Features:
- * - Z-pattern and F-pattern reading flow awareness
- * - WCAG AA contrast checking (4.5:1 ratio)
- * - Dynamic font sizing based on text length
- * - Safe zone enforcement per format
- * - Logo placement rules (top-right or bottom-right, never center)
- * - CTA placement (lower third, centered or right-aligned)
- * - Visual weight balancing
- */
-import { AdFormat } from './promptEngine.js';
 export declare const WCAG_AA_RATIO = 4.5;
-export interface SafeZone {
-    top: number;
-    right: number;
-    bottom: number;
-    left: number;
-}
-export declare const SAFE_ZONES: Record<AdFormat, SafeZone>;
-export interface FontSizeConfig {
+export declare const SAFE_ZONES: {
+    square: {
+        top: number;
+        bottom: number;
+    };
+    portrait: {
+        top: number;
+        bottom: number;
+    };
+    story: {
+        top: number;
+        bottom: number;
+    };
+};
+export declare const FONT_SIZES: {
     headline: {
         min: number;
         max: number;
@@ -35,79 +29,55 @@ export interface FontSizeConfig {
         max: number;
         default: number;
     };
+};
+interface FontSizeConfig {
+    min: number;
+    max: number;
+    default: number;
 }
-export declare const FONT_SIZES: FontSizeConfig;
-export interface Position {
+interface Position {
     x: number;
     y: number;
 }
-export interface ElementLayout {
+interface TextElement {
+    text: string;
     position: Position;
     fontSize: number;
+    color: string;
     width: number;
     height: number;
-    alignment: 'left' | 'center' | 'right';
 }
 export interface LayoutOutput {
-    format: AdFormat;
+    format: string;
     width: number;
     height: number;
-    safeZone: SafeZone;
-    headline: ElementLayout;
-    subhead: ElementLayout;
-    cta: ElementLayout;
+    headline: TextElement;
+    subhead: TextElement;
+    cta: TextElement;
     logoPosition: Position;
     textColors: {
         headline: string;
         subhead: string;
         cta: string;
-        ctaBackground: string;
     };
     contrastRatios: {
         headline: number;
         subhead: number;
         cta: number;
     };
-    readingPattern: 'z-pattern' | 'f-pattern';
+    readingPattern: string;
 }
-export type ReadingPattern = 'z-pattern' | 'f-pattern';
-/**
- * Calculate contrast ratio between two colors
- * WCAG 2.0 formula
- */
 export declare function calculateContrastRatio(color1: string, color2: string): number;
-/**
- * Check if contrast ratio meets WCAG AA
- */
 export declare function meetsContrastRequirement(color1: string, color2: string): boolean;
-/**
- * Find a text color that meets contrast requirements against a background
- */
-export declare function findAccessibleTextColor(backgroundColor: string, preferredColor?: string): {
+export declare function findAccessibleTextColor(bgColor: string, preferred?: string): {
     color: string;
     ratio: number;
 };
-/**
- * Calculate dynamic font size based on text length
- */
-export declare function calculateFontSize(text: string, config: {
-    min: number;
-    max: number;
-    default: number;
-}, maxWidth: number): number;
-/**
- * Generate complete layout for an ad
- */
-export declare function generateLayout(format: string, headline: string, subhead: string, cta: string, backgroundColor: string, accentColor: string, hasVisualElement?: boolean): LayoutOutput;
-/**
- * Validate layout meets all requirements
- */
+export declare function calculateFontSize(text: string, config: FontSizeConfig, containerWidth: number): number;
+export declare function generateLayout(format: string, headline: string, subhead: string, ctaText: string, bgColor: string, accentColor: string): LayoutOutput;
 export declare function validateLayout(layout: LayoutOutput): {
     valid: boolean;
     warnings: string[];
 };
-/**
- * Adjust layout for visual weight balancing
- * If product image is on one side, offset text to the other
- */
-export declare function balanceVisualWeight(layout: LayoutOutput, productImagePosition: 'left' | 'center' | 'right'): LayoutOutput;
+export declare function balanceVisualWeight(layout: LayoutOutput, imagePosition: 'left' | 'right' | 'center'): LayoutOutput;
+export {};

@@ -21,7 +21,7 @@ const COLOR_NAME_MAP = {
 };
 export function parsePrompt(prompt) {
     const lower = prompt.toLowerCase();
-    // Extract offer (percentages, dollar amounts, BOGO, free shipping, etc.)
+    // Extract offer
     const offerPatterns = [
         /(\d+%\s*off)/i,
         /(\$\d+\s*off)/i,
@@ -41,20 +41,20 @@ export function parsePrompt(prompt) {
     }
     // Extract vibe
     const vibeKeywords = Object.keys(VIBE_COLOR_MAP);
-    let vibe = 'energetic'; // default
+    let vibe = 'energetic';
     for (const v of vibeKeywords) {
         if (lower.includes(v)) {
             vibe = v;
             break;
         }
     }
-    // Extract colors mentioned
+    // Extract colors
     const colors = [];
     for (const [name, hex] of Object.entries(COLOR_NAME_MAP)) {
         if (lower.includes(name))
             colors.push(hex);
     }
-    // Extract product - remove offer, vibe, color words, common filler
+    // Extract product
     let product = prompt;
     if (offer)
         product = product.replace(new RegExp(offer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '');
@@ -62,7 +62,6 @@ export function parsePrompt(prompt) {
         product = product.replace(new RegExp(`\\b${v}\\b`, 'gi'), '');
     for (const c of Object.keys(COLOR_NAME_MAP))
         product = product.replace(new RegExp(`\\b${c}\\b`, 'gi'), '');
-    // Remove filler words
     product = product.replace(/\b(and|the|a|an|for|with|vibe|sale|discount)\b/gi, '');
     product = product.replace(/[,]+/g, ' ').replace(/\s+/g, ' ').trim();
     return { product: product || 'product', offer, vibe, colors, rawPrompt: prompt };
@@ -71,16 +70,15 @@ export function generateAdSpec(parsed, format, templateId) {
     const { product, offer, vibe, colors, rawPrompt } = parsed;
     // 1. Detect product category
     const category = detectCategory(product, rawPrompt);
-    // 2. Generate enhanced image prompt using promptEngine
+    // 2. Generate enhanced image prompt
     const enhancedPrompt = generateEnhancedPrompt(product, rawPrompt, vibe, format ?? 'square', colors);
-    // 3. Generate copy using copyEngine
+    // 3. Generate copy
     const copy = generateCopy({
         product,
         offer: offer || undefined,
         vibe,
         category,
     });
-    // Validate copy meets character limits (log warnings if not)
     const copyValidation = validateCopy(copy);
     if (!copyValidation.valid) {
         console.warn('Copy validation warnings:', copyValidation.errors);
@@ -94,12 +92,10 @@ export function generateAdSpec(parsed, format, templateId) {
         text: '#FFFFFF',
         background: '#121212',
     };
-    // 5. Generate layout using layoutEngine
-    const layout = generateLayout(format ?? 'square', copy.headline, copy.subhead, copy.cta, adColors.background, adColors.accent, true // has visual element (product image)
-    );
-    // Update text color based on contrast checking
+    // 5. Generate layout
+    const layout = generateLayout(format ?? 'square', copy.headline, copy.subhead, copy.cta, adColors.background, adColors.accent);
     adColors.text = layout.textColors.headline;
-    // 6. Build complete AdSpec with all enhanced fields
+    // 6. Build AdSpec
     return {
         imagePrompt: enhancedPrompt.prompt,
         texts: {
@@ -132,5 +128,4 @@ export function createGenerateAdRouter() {
     });
     return router;
 }
-// Re-export for backward compatibility and testing
 export { VIBE_COLOR_MAP, COLOR_NAME_MAP };

@@ -1,328 +1,182 @@
-/**
- * Prompt Engine - Transforms simple user prompts into design-aware, professional image prompts
- *
- * Applies:
- * - Ad format awareness (square, portrait, story)
- * - Design principles (rule of thirds, visual hierarchy, breathing room)
- * - Product category detection with category-specific photography styles
- * - Text-safe zones for overlay areas
- * - Professional photography direction (lighting, depth of field, background)
- */
+// Prompt Engine - Transform simple prompts into design-aware image prompts
 export const FORMAT_CONFIGS = {
     square: {
         aspectRatio: '1:1',
         width: 1080,
         height: 1080,
-        composition: 'centered balanced composition',
-        safeZoneTop: 15,
-        safeZoneBottom: 20,
-        productPlacement: 'center or rule-of-thirds intersection',
+        safeZoneTop: 0.20,
+        safeZoneBottom: 0.25,
+        composition: 'centered product placement with rule of thirds, balanced composition for square format',
     },
     portrait: {
         aspectRatio: '4:5',
         width: 1080,
         height: 1350,
-        composition: 'vertical emphasis with product prominence',
-        safeZoneTop: 12,
-        safeZoneBottom: 22,
-        productPlacement: 'center or lower-third for upward flow',
+        safeZoneTop: 0.20,
+        safeZoneBottom: 0.25,
+        composition: 'vertical emphasis with product in center third, breathing room at top and bottom for text overlays',
     },
     story: {
         aspectRatio: '9:16',
         width: 1080,
         height: 1920,
-        composition: 'vertical narrative flow, eye-catching from top',
-        safeZoneTop: 10,
-        safeZoneBottom: 25,
-        productPlacement: 'center-vertical, with space above for hook',
+        safeZoneTop: 0.15,
+        safeZoneBottom: 0.30,
+        composition: 'full vertical layout with product in middle zone, generous negative space at top and bottom for text',
     },
 };
 export const CATEGORY_CONFIGS = {
     food: {
-        keywords: ['food', 'restaurant', 'meal', 'drink', 'coffee', 'pizza', 'burger', 'sushi', 'dessert', 'cake', 'chocolate', 'snack', 'beverage', 'wine', 'beer', 'cocktail', 'smoothie', 'juice', 'tea', 'bakery', 'pastry', 'ice cream', 'salad', 'soup', 'sandwich', 'taco', 'pasta', 'steak', 'seafood'],
-        photographyStyle: 'appetizing food photography, editorial food magazine quality',
-        lightingStyle: 'soft natural window light, gentle shadows, appetizing warm tones',
-        backgroundStyle: 'rustic wooden surface, marble countertop, or clean white with subtle texture',
-        angle: 'overhead flat lay or 45-degree angle for depth',
-        colorScheme: 'warm appetizing colors, golden hour tones',
-        props: ['fresh ingredients', 'herbs', 'cutlery', 'napkins', 'plates'],
+        photographyStyle: 'overhead food photography with appetizing presentation',
+        lightingStyle: 'warm natural lighting with soft shadows',
+        backgroundStyle: 'rustic wood or marble surface, lifestyle setting',
+        colorPalette: 'warm tones - reds, oranges, golden yellows',
+        depthOfField: 'shallow depth of field on hero ingredient',
     },
     fashion: {
-        keywords: ['fashion', 'clothing', 'apparel', 'dress', 'shirt', 'pants', 'shoes', 'sneakers', 'boots', 'jacket', 'coat', 'jeans', 'sweater', 'hoodie', 'accessories', 'bag', 'purse', 'wallet', 'belt', 'hat', 'cap', 'sunglasses', 'watch', 'jewelry', 'necklace', 'bracelet', 'ring', 'earrings'],
-        photographyStyle: 'editorial fashion photography, high-end magazine aesthetic',
-        lightingStyle: 'dramatic key light with soft fill, rim lighting for separation',
-        backgroundStyle: 'seamless gradient, minimal studio backdrop, or editorial location',
-        angle: 'eye-level or slightly low angle for presence',
-        colorScheme: 'contrast-driven, brand-aligned colors',
-        props: ['lifestyle elements', 'subtle reflections', 'fabric draping'],
+        photographyStyle: 'editorial fashion photography with dynamic pose',
+        lightingStyle: 'dramatic studio lighting with contrast',
+        backgroundStyle: 'minimal studio or urban environment',
+        colorPalette: 'high contrast with complementary colors',
+        depthOfField: 'medium depth of field, sharp subject with soft background',
     },
     tech: {
-        keywords: ['tech', 'technology', 'gadget', 'phone', 'laptop', 'computer', 'tablet', 'headphones', 'earbuds', 'speaker', 'camera', 'drone', 'gaming', 'console', 'keyboard', 'mouse', 'monitor', 'tv', 'smart', 'watch', 'fitness tracker', 'charger', 'cable', 'case', 'app', 'software'],
-        photographyStyle: 'clean product photography, Apple-style minimal aesthetic',
-        lightingStyle: 'soft diffused lighting, subtle gradient reflections, highlight edges',
-        backgroundStyle: 'solid gradient or subtle texture, minimal and clean',
-        angle: 'product hero shot, slight angle to show depth',
-        colorScheme: 'cool modern tones, white/black/silver with accent color',
-        props: ['minimal shadows', 'gradient reflections', 'subtle lifestyle hints'],
+        photographyStyle: 'minimal tech product photography on clean surface',
+        lightingStyle: 'cool studio lighting with reflections',
+        backgroundStyle: 'gradient or clean minimal background',
+        colorPalette: 'cool tones - blues, silvers, whites',
+        depthOfField: 'deep depth of field for product detail clarity',
     },
     beauty: {
-        keywords: ['beauty', 'skincare', 'makeup', 'cosmetics', 'lipstick', 'mascara', 'foundation', 'serum', 'cream', 'lotion', 'moisturizer', 'perfume', 'fragrance', 'hair', 'shampoo', 'conditioner', 'styling', 'nail', 'polish', 'brush', 'sponge', 'mirror', 'spa'],
-        photographyStyle: 'beauty editorial photography, clean and luxurious',
-        lightingStyle: 'soft beauty lighting, even illumination, minimal harsh shadows',
-        backgroundStyle: 'soft gradient, pastel tones, or clean white',
-        angle: 'product focus with soft focus background, 45-degree or front-facing',
-        colorScheme: 'soft pastels, rose gold, white, or brand colors',
-        props: ['flowers', 'soft fabrics', 'water droplets', 'marble surfaces'],
+        photographyStyle: 'luxury beauty product photography with artistic arrangement',
+        lightingStyle: 'soft diffused lighting with gentle highlights',
+        backgroundStyle: 'elegant pastel or marble surface',
+        colorPalette: 'soft pinks, golds, and neutrals',
+        depthOfField: 'shallow depth of field with bokeh',
     },
     fitness: {
-        keywords: ['fitness', 'workout', 'gym', 'exercise', 'training', 'sports', 'athletic', 'running', 'yoga', 'weights', 'dumbbell', 'kettlebell', 'mat', 'resistance', 'protein', 'supplement', 'water bottle', 'activewear', 'leggings', 'sports bra', 'shorts', 'tank', 'shoes', 'sneakers'],
-        photographyStyle: 'dynamic sports photography, energetic and motivational',
-        lightingStyle: 'dramatic lighting with strong highlights, sweat glisten effect',
-        backgroundStyle: 'gym environment, outdoor setting, or clean studio with dynamic feel',
-        angle: 'low angle for power, action shots, or product hero',
-        colorScheme: 'energetic bold colors, neon accents, or clean black/white',
-        props: ['equipment', 'sweat effect', 'motion blur', 'energy trails'],
+        photographyStyle: 'dynamic fitness photography with energy and motion',
+        lightingStyle: 'high-key energetic lighting',
+        backgroundStyle: 'gym environment or outdoor active setting',
+        colorPalette: 'bold energetic colors - neons, blacks, whites',
+        depthOfField: 'medium depth of field capturing action',
     },
     travel: {
-        keywords: ['travel', 'vacation', 'holiday', 'trip', 'flight', 'hotel', 'resort', 'beach', 'mountain', 'adventure', 'tour', 'cruise', 'booking', 'destination', 'luggage', 'suitcase', 'backpack', 'passport', 'guide', 'experience', 'explore'],
-        photographyStyle: 'destination photography, wanderlust-inducing travel imagery',
-        lightingStyle: 'golden hour or blue hour, natural dramatic lighting',
-        backgroundStyle: 'stunning landscapes, iconic landmarks, or luxury interiors',
-        angle: 'wide establishing shot or intimate detail focus',
-        colorScheme: 'vibrant destination colors, warm sunset or cool ocean tones',
-        props: ['travel accessories', 'local elements', 'natural scenery'],
+        photographyStyle: 'scenic travel photography with wanderlust appeal',
+        lightingStyle: 'golden hour natural lighting',
+        backgroundStyle: 'stunning destination landscape',
+        colorPalette: 'natural earth tones and sky blues',
+        depthOfField: 'deep depth of field for landscape detail',
     },
     home: {
-        keywords: ['home', 'furniture', 'decor', 'interior', 'bedding', 'pillow', 'blanket', 'lamp', 'lighting', 'rug', 'curtain', 'kitchen', 'bathroom', 'storage', 'organization', 'appliance', 'garden', 'outdoor', 'patio', 'tools', 'diy'],
-        photographyStyle: 'interior design photography, lifestyle home aesthetic',
-        lightingStyle: 'natural room lighting, soft ambient, warm and inviting',
-        backgroundStyle: 'styled room setting, lifestyle context, or clean studio',
-        angle: 'room view or product detail, lifestyle context',
-        colorScheme: 'warm earth tones, neutrals, or on-trend palette',
-        props: ['styled elements', 'plants', 'books', 'textures'],
+        photographyStyle: 'interior lifestyle photography with cozy atmosphere',
+        lightingStyle: 'warm ambient interior lighting',
+        backgroundStyle: 'styled home interior setting',
+        colorPalette: 'warm neutrals, earth tones',
+        depthOfField: 'medium depth of field with room context',
     },
     automotive: {
-        keywords: ['car', 'auto', 'vehicle', 'truck', 'suv', 'motorcycle', 'bike', 'electric', 'hybrid', 'luxury', 'sedan', 'sports car', 'lease', 'dealer', 'parts', 'tires', 'accessories', 'service', 'maintenance'],
-        photographyStyle: 'automotive photography, showroom quality',
-        lightingStyle: 'studio car lighting, dramatic reflections, highlight curves',
-        backgroundStyle: 'gradient backdrop, scenic road, or showroom floor',
-        angle: 'three-quarter front angle for dynamic presence',
-        colorScheme: 'sleek metallic tones, dramatic contrast',
-        props: ['reflection highlights', 'environmental hints'],
+        photographyStyle: 'automotive photography with dramatic angles',
+        lightingStyle: 'dramatic directional lighting with reflections',
+        backgroundStyle: 'open road or sleek studio',
+        colorPalette: 'metallic tones, deep blacks, vibrant accents',
+        depthOfField: 'deep depth of field showing full vehicle detail',
     },
     jewelry: {
-        keywords: ['jewelry', 'ring', 'necklace', 'bracelet', 'earrings', 'pendant', 'diamond', 'gold', 'silver', 'platinum', 'gem', 'stone', 'pearl', 'watch', 'luxury', 'fine jewelry', 'engagement', 'wedding'],
-        photographyStyle: 'luxury jewelry photography, macro detail focus',
-        lightingStyle: 'sparkling light, multiple catchlights, dramatic sparkle',
-        backgroundStyle: 'black velvet, white seamless, or elegant gradient',
-        angle: 'macro detail or elegant product display',
-        colorScheme: 'rich luxurious tones, gold, silver, precious stone colors',
-        props: ['elegant display stands', 'soft fabric', 'flowers'],
+        photographyStyle: 'macro jewelry photography with sparkle and detail',
+        lightingStyle: 'precise spot lighting for sparkle and reflections',
+        backgroundStyle: 'dark velvet or elegant neutral surface',
+        colorPalette: 'rich darks with metallic highlights',
+        depthOfField: 'very shallow depth of field highlighting gems and details',
     },
     general: {
-        keywords: [],
-        photographyStyle: 'professional commercial photography',
-        lightingStyle: 'studio lighting, well-lit product presentation',
-        backgroundStyle: 'clean gradient or minimal backdrop',
-        angle: 'product hero shot',
-        colorScheme: 'brand-appropriate colors',
-        props: [],
+        photographyStyle: 'professional commercial product photography',
+        lightingStyle: 'balanced studio lighting',
+        backgroundStyle: 'clean neutral background',
+        colorPalette: 'versatile neutral palette',
+        depthOfField: 'medium depth of field',
     },
 };
-export const COLOR_PSYCHOLOGY = {
-    food: {
-        mood: 'appetizing, warm, inviting',
-        primaryHues: ['warm orange', 'golden yellow', 'rich red', 'creamy white'],
-        accentHues: ['fresh green', 'burgundy', 'chocolate brown'],
-        avoidColors: ['blue', 'purple', 'grey'],
-    },
-    fashion: {
-        mood: 'sophisticated, aspirational, trendy',
-        primaryHues: ['black', 'white', 'navy', 'burgundy'],
-        accentHues: ['gold', 'silver', 'bold accent'],
-        avoidColors: ['neon combinations'],
-    },
-    tech: {
-        mood: 'modern, innovative, sleek',
-        primaryHues: ['white', 'black', 'silver', 'space grey'],
-        accentHues: ['electric blue', 'subtle gradient'],
-        avoidColors: ['warm earth tones', 'pastels'],
-    },
-    beauty: {
-        mood: 'luxurious, clean, feminine',
-        primaryHues: ['soft pink', 'rose gold', 'white', 'nude'],
-        accentHues: ['gold', 'champagne', 'soft coral'],
-        avoidColors: ['harsh primaries', 'dark heavy colors'],
-    },
-    fitness: {
-        mood: 'energetic, powerful, motivating',
-        primaryHues: ['black', 'electric blue', 'neon accent', 'bold red'],
-        accentHues: ['white', 'silver', 'energy yellow'],
-        avoidColors: ['muted pastels', 'faded tones'],
-    },
-    travel: {
-        mood: 'adventurous, dreamy, escapist',
-        primaryHues: ['ocean blue', 'sunset orange', 'forest green', 'sand'],
-        accentHues: ['golden hour gold', 'turquoise'],
-        avoidColors: ['industrial grey', 'harsh neons'],
-    },
-    home: {
-        mood: 'cozy, inviting, stylish',
-        primaryHues: ['warm white', 'soft grey', 'natural wood', 'sage green'],
-        accentHues: ['terracotta', 'navy', 'mustard'],
-        avoidColors: ['harsh primaries', 'neon'],
-    },
-    automotive: {
-        mood: 'powerful, luxurious, dynamic',
-        primaryHues: ['silver', 'black', 'deep blue', 'metallic'],
-        accentHues: ['chrome', 'carbon fiber black'],
-        avoidColors: ['pastels', 'muted earth tones'],
-    },
-    jewelry: {
-        mood: 'luxurious, elegant, precious',
-        primaryHues: ['gold', 'silver', 'white', 'black'],
-        accentHues: ['diamond white', 'sapphire blue', 'ruby red'],
-        avoidColors: ['clashing primaries', 'cheap-looking brights'],
-    },
-    general: {
-        mood: 'professional, trustworthy',
-        primaryHues: ['blue', 'white', 'grey'],
-        accentHues: ['accent color'],
-        avoidColors: [],
-    },
+const CATEGORY_KEYWORDS = {
+    food: ['pizza', 'burger', 'coffee', 'sushi', 'cake', 'restaurant', 'meal', 'dish', 'recipe', 'cook', 'food', 'drink', 'tea', 'bread', 'salad', 'pasta'],
+    fashion: ['dress', 'shirt', 'jacket', 'sneakers', 'shoes', 'jeans', 'clothing', 'outfit', 'wear', 'fashion', 'apparel', 'hoodie', 'coat', 'boots'],
+    tech: ['laptop', 'phone', 'headphones', 'tablet', 'computer', 'gadget', 'app', 'software', 'smartphone', 'tech', 'device', 'camera', 'speaker', 'monitor'],
+    beauty: ['lipstick', 'skincare', 'perfume', 'makeup', 'mascara', 'foundation', 'serum', 'moisturizer', 'beauty', 'cosmetic', 'lotion', 'cream'],
+    fitness: ['workout', 'gym', 'protein', 'yoga', 'fitness', 'exercise', 'training', 'muscle', 'supplement', 'weights', 'running'],
+    travel: ['travel', 'flight', 'hotel', 'vacation', 'trip', 'destination', 'resort', 'booking', 'tour', 'adventure'],
+    home: ['furniture', 'decor', 'sofa', 'lamp', 'kitchen', 'bedroom', 'living room', 'home', 'interior', 'candle'],
+    automotive: ['car', 'vehicle', 'auto', 'driving', 'motor', 'truck', 'suv', 'sedan', 'automotive'],
+    jewelry: ['necklace', 'ring', 'bracelet', 'earring', 'jewelry', 'diamond', 'gold chain', 'pendant', 'watch'],
 };
-/**
- * Detect product category from the product description and keywords
- */
-export function detectCategory(product, rawPrompt) {
-    const text = `${product} ${rawPrompt}`.toLowerCase();
-    for (const [category, config] of Object.entries(CATEGORY_CONFIGS)) {
-        if (category === 'general')
-            continue;
-        for (const keyword of config.keywords) {
-            if (text.includes(keyword.toLowerCase())) {
-                return category;
-            }
+export function detectCategory(product, description) {
+    const text = `${product} ${description}`.toLowerCase();
+    for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+        if (keywords.some(kw => text.includes(kw))) {
+            return category;
         }
     }
     return 'general';
 }
-/**
- * Get format configuration
- */
 export function getFormatConfig(format) {
-    const normalized = format.toLowerCase().trim();
-    if (normalized === 'story' || normalized === '9:16')
-        return FORMAT_CONFIGS.story;
-    if (normalized === 'portrait' || normalized === '4:5')
-        return FORMAT_CONFIGS.portrait;
-    return FORMAT_CONFIGS.square;
+    const formatMap = {
+        '1:1': 'square',
+        '4:5': 'portrait',
+        '9:16': 'story',
+    };
+    const key = formatMap[format] || format;
+    return FORMAT_CONFIGS[key] || FORMAT_CONFIGS.square;
 }
-/**
- * Generate text-safe zone instructions for the image prompt
- */
-export function generateTextSafeZoneInstructions(formatConfig) {
-    const topPercent = formatConfig.safeZoneTop;
-    const bottomPercent = formatConfig.safeZoneBottom;
-    return `IMPORTANT: Leave the top ${topPercent}% of the image clean and uncluttered for headline text overlay. Leave the bottom ${bottomPercent}% of the image with a clean, uncluttered area suitable for CTA button and call-to-action text. The product and main visual elements should be positioned in the central zone to avoid text overlap.`;
+export function generateTextSafeZoneInstructions(config) {
+    const topPct = Math.round(config.safeZoneTop * 100);
+    const bottomPct = Math.round(config.safeZoneBottom * 100);
+    return `Keep the top ${topPct}% and bottom ${bottomPct}% of the image clean and uncluttered for text overlay placement. Avoid placing the main subject or busy elements in these zones. The product should be positioned in the middle zone to allow breathing room for headlines and CTAs.`;
 }
-/**
- * Generate rule of thirds placement instructions
- */
-export function generatePlacementInstructions(format) {
-    switch (format) {
-        case 'square':
-            return 'Position the hero product at one of the rule-of-thirds intersection points (upper-left, upper-right, lower-left, or lower-right) or centered, leaving breathing room around edges.';
-        case 'portrait':
-            return 'Position the hero product in the central zone, slightly lower than center to create upward visual flow, maintaining breathing room at top and bottom.';
-        case 'story':
-            return 'Position the hero product vertically centered or in the middle-third of the frame, with clear space above for a hook/headline and below for CTA.';
-        default:
-            return 'Position the hero product with proper visual hierarchy and breathing room.';
-    }
-}
-/**
- * Generate professional photography direction
- */
-export function generatePhotographyDirections(category, vibe, formatConfig) {
-    const catConfig = CATEGORY_CONFIGS[category];
-    const colorPsych = COLOR_PSYCHOLOGY[category];
-    return [
-        `Photography style: ${catConfig.photographyStyle}`,
-        `Lighting: ${catConfig.lightingStyle}`,
-        `Camera angle: ${catConfig.angle}`,
-        `Background: ${catConfig.backgroundStyle}`,
-        `Color treatment: ${colorPsych.mood} mood with ${colorPsych.primaryHues.slice(0, 2).join(' and ')} tones`,
-        `Composition: ${formatConfig.composition}`,
-        `Depth of field: shallow depth of field for product focus with soft background blur`,
-        `Quality: ultra high resolution, professional commercial grade, magazine quality`,
-    ].join('. ');
-}
-/**
- * Generate the enhanced image prompt
- */
-export function enhanceImagePrompt(input) {
-    const { product, category, vibe, format, offer, colors } = input;
+export function generateEnhancedPrompt(product, description, vibe, format, colors) {
+    const category = detectCategory(product, description);
     const formatConfig = getFormatConfig(format);
-    const catConfig = CATEGORY_CONFIGS[category];
-    const colorPsych = COLOR_PSYCHOLOGY[category];
-    // Build the comprehensive prompt
-    const promptParts = [];
-    // 1. Opening: Professional photography style
-    promptParts.push(`${catConfig.photographyStyle} of ${product}`);
-    // 2. Composition and format
-    promptParts.push(`${formatConfig.aspectRatio} aspect ratio, ${formatConfig.composition}`);
-    // 3. Lighting
-    promptParts.push(catConfig.lightingStyle);
-    // 4. Camera angle and background
-    promptParts.push(`Shot from ${catConfig.angle}`);
-    promptParts.push(`${catConfig.backgroundStyle}`);
-    // 5. Color psychology
-    const colorInstructions = colors && colors.length > 0
-        ? `Color palette featuring ${colors.join(' and ')}`
-        : `${colorPsych.mood} color palette with ${colorPsych.primaryHues.slice(0, 2).join(' and ')} as primary tones`;
-    promptParts.push(colorInstructions);
-    // 6. Product placement with rule of thirds
-    promptParts.push(generatePlacementInstructions(format));
-    // 7. Depth of field and professional quality
-    promptParts.push('Shallow depth of field with beautiful bokeh background');
-    promptParts.push('Ultra high resolution, professional commercial photography quality');
-    // 8. Text-safe zones (critical for ad overlays)
-    promptParts.push(generateTextSafeZoneInstructions(formatConfig));
-    // 9. Vibe/mood if specific
-    if (vibe && vibe !== 'energetic') {
-        promptParts.push(`Overall mood: ${vibe}`);
+    const categoryConfig = CATEGORY_CONFIGS[category] || CATEGORY_CONFIGS.general;
+    const textSafeZoneInstructions = generateTextSafeZoneInstructions(formatConfig);
+    const parts = [
+        `Professional quality commercial advertisement image.`,
+        `${categoryConfig.photographyStyle}.`,
+        `Product: ${product}. ${description}.`,
+        `Mood/vibe: ${vibe}.`,
+        `${categoryConfig.lightingStyle}.`,
+        `Background: ${categoryConfig.backgroundStyle}.`,
+        `Color palette: ${categoryConfig.colorPalette}.`,
+        `Depth of field: ${categoryConfig.depthOfField}.`,
+        `Composition: ${formatConfig.composition}.`,
+        `Aspect ratio: ${formatConfig.aspectRatio}.`,
+        textSafeZoneInstructions,
+        `Rule of thirds product placement with visual hierarchy.`,
+    ];
+    if (colors && colors.length > 0) {
+        parts.push(`Incorporate these brand colors: ${colors.join(', ')}.`);
     }
-    // 10. Props if applicable
-    if (catConfig.props.length > 0) {
-        promptParts.push(`Styling details: ${catConfig.props.slice(0, 2).join(', ')}`);
-    }
-    const fullPrompt = promptParts.join('. ');
     return {
-        prompt: fullPrompt,
+        prompt: parts.join(' '),
         category,
         formatConfig,
-        textSafeZoneInstructions: generateTextSafeZoneInstructions(formatConfig),
-        photographyDirections: generatePhotographyDirections(category, vibe, formatConfig),
+        textSafeZoneInstructions,
     };
 }
-/**
- * Main entry point for prompt engine
- */
-export function generateEnhancedPrompt(product, rawPrompt, vibe, format, colors) {
-    // Detect category
-    const category = detectCategory(product, rawPrompt);
-    // Normalize format
-    const adFormat = format === 'story' || format === '9:16'
-        ? 'story'
-        : format === 'portrait' || format === '4:5'
-            ? 'portrait'
-            : 'square';
-    return enhanceImagePrompt({
-        product,
+export function enhanceImagePrompt(options) {
+    const { product, category, vibe, format, colors } = options;
+    const catConfig = CATEGORY_CONFIGS[category] || CATEGORY_CONFIGS.general;
+    const formatConfig = getFormatConfig(format);
+    const textSafeZoneInstructions = generateTextSafeZoneInstructions(formatConfig);
+    const photographyDirections = [
+        `Style: ${catConfig.photographyStyle}`,
+        `Lighting: ${catConfig.lightingStyle}`,
+        `Background: ${catConfig.backgroundStyle}`,
+        `Depth of field: ${catConfig.depthOfField}`,
+    ].join('. ');
+    const result = generateEnhancedPrompt(product, product, vibe, format, colors);
+    return {
+        prompt: result.prompt,
         category,
-        vibe,
-        format: adFormat,
-        colors,
-    });
+        formatConfig,
+        textSafeZoneInstructions,
+        photographyDirections,
+    };
 }

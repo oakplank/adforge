@@ -18,26 +18,21 @@ export class NanoBananaClient {
     constructor(apiKey) {
         this.apiKey = apiKey;
     }
-    async generateImage(prompt, width, height) {
+    async generateImage(prompt, width, height, enhancedPrompt) {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 120_000);
         try {
-            // Use Gemini 3 Pro Image for high-quality ad image generation
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${this.apiKey}`;
             const response = await fetch(url, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     contents: [{
                             parts: [{
-                                    text: `Generate an image: ${prompt}. The image should be ${width}x${height} pixels, high quality, professional advertising style.`
+                                    text: enhancedPrompt ?? `Generate an image: ${prompt}. The image should be ${width}x${height} pixels, high quality, professional advertising style.`
                                 }]
                         }],
-                    generationConfig: {
-                        responseModalities: ["TEXT", "IMAGE"],
-                    }
+                    generationConfig: { responseModalities: ["TEXT", "IMAGE"] }
                 }),
                 signal: controller.signal,
             });
@@ -46,7 +41,6 @@ export class NanoBananaClient {
                 throw new Error(`Gemini API returned ${response.status}: ${text}`);
             }
             const data = await response.json();
-            // Extract image from Gemini response
             const candidates = data.candidates;
             if (!candidates || candidates.length === 0) {
                 throw new Error('No candidates in Gemini response');
@@ -55,7 +49,6 @@ export class NanoBananaClient {
             if (!parts) {
                 throw new Error('No parts in Gemini response');
             }
-            // Find the inline_data part with the image
             for (const part of parts) {
                 if (part.inlineData?.mimeType?.startsWith('image/')) {
                     return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
@@ -83,7 +76,7 @@ export function createGenerateImageRouter(client) {
             res.status(429).json({ error: 'Rate limit exceeded. Try again later.' });
             return;
         }
-        const { prompt, width, height } = req.body;
+        const { prompt, width, height, enhancedPrompt } = req.body;
         if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
             res.status(400).json({ error: 'Missing or invalid prompt' });
             return;
@@ -96,9 +89,9 @@ export function createGenerateImageRouter(client) {
         }
         try {
             console.log(`Generating image: "${prompt.trim().substring(0, 50)}..." (${w}x${h})`);
-            const result = await imageClient.generateImage(prompt.trim(), w, h);
+            const ep = enhancedPrompt && typeof enhancedPrompt === 'string' ? enhancedPrompt.trim() : undefined;
+            const result = await imageClient.generateImage(prompt.trim(), w, h, ep);
             if (result.startsWith('data:')) {
-                // Data URL - extract base64
                 const base64 = result.split(',')[1];
                 res.json({ imageBase64: base64, mimeType: 'image/png' });
             }
