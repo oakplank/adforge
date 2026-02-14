@@ -1,0 +1,8 @@
+{
+  "name": "adforge-server",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  }
+}
