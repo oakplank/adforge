@@ -22,7 +22,7 @@ export class NanoBananaClient {
     this.apiKey = apiKey;
   }
 
-  async generateImage(prompt: string, width: number, height: number): Promise<string> {
+  async generateImage(prompt: string, width: number, height: number, enhancedPrompt?: string): Promise<string> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 120_000);
     try {
@@ -33,7 +33,7 @@ export class NanoBananaClient {
         body: JSON.stringify({
           contents: [{
             parts: [{
-              text: `Generate an image: ${prompt}. The image should be ${width}x${height} pixels, high quality, professional advertising style.`
+              text: enhancedPrompt ?? `Generate an image: ${prompt}. The image should be ${width}x${height} pixels, high quality, professional advertising style.`
             }]
           }],
           generationConfig: { responseModalities: ["TEXT", "IMAGE"] }
@@ -88,7 +88,7 @@ export function createGenerateImageRouter(client?: NanoBananaClient): Router {
       return;
     }
 
-    const { prompt, width, height } = req.body;
+    const { prompt, width, height, enhancedPrompt } = req.body;
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
       res.status(400).json({ error: 'Missing or invalid prompt' });
       return;
@@ -103,7 +103,8 @@ export function createGenerateImageRouter(client?: NanoBananaClient): Router {
 
     try {
       console.log(`Generating image: "${prompt.trim().substring(0, 50)}..." (${w}x${h})`);
-      const result = await imageClient.generateImage(prompt.trim(), w, h);
+      const ep = enhancedPrompt && typeof enhancedPrompt === 'string' ? enhancedPrompt.trim() : undefined;
+      const result = await imageClient.generateImage(prompt.trim(), w, h, ep);
 
       if (result.startsWith('data:')) {
         const base64 = result.split(',')[1];

@@ -78,6 +78,50 @@ describe('NanoBananaClient', () => {
     await expect(client.generateImage('prompt', 512, 512)).rejects.toThrow('No candidates');
   });
 
+  it('uses enhancedPrompt when provided', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        candidates: [{
+          content: {
+            parts: [{
+              inlineData: { mimeType: 'image/png', data: 'enhanced123' }
+            }]
+          }
+        }]
+      }),
+    });
+    globalThis.fetch = mockFetch;
+
+    const client = new NanoBananaClient('key');
+    const result = await client.generateImage('basic prompt', 1080, 1080, 'A detailed enhanced prompt with photography direction');
+    expect(result).toContain('enhanced123');
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(callBody.contents[0].parts[0].text).toBe('A detailed enhanced prompt with photography direction');
+    expect(callBody.contents[0].parts[0].text).not.toContain('basic prompt');
+  });
+
+  it('uses basic prompt when enhancedPrompt is not provided', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        candidates: [{
+          content: {
+            parts: [{
+              inlineData: { mimeType: 'image/png', data: 'basic123' }
+            }]
+          }
+        }]
+      }),
+    });
+    globalThis.fetch = mockFetch;
+
+    const client = new NanoBananaClient('key');
+    await client.generateImage('basic prompt', 1080, 1080);
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(callBody.contents[0].parts[0].text).toContain('basic prompt');
+  });
+
   it('throws error when response has no image data', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
