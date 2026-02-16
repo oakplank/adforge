@@ -118,6 +118,38 @@ function toPlacementHints(adSpec: AdSpec, format: string): PlacementHints {
   };
 }
 
+async function persistGenerationHistory(
+  prompt: string,
+  format: string,
+  width: number,
+  height: number,
+  adSpec: AdSpec,
+  imgData: Record<string, unknown>
+): Promise<void> {
+  try {
+    await fetch('/api/generations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt,
+        format,
+        width,
+        height,
+        imagePrompt: adSpec.imagePrompt,
+        enhancedPrompt: adSpec.metadata?.promptPipeline?.renderPrompt,
+        systemPrompt: adSpec.metadata?.promptPipeline?.systemPrompt,
+        model: adSpec.metadata?.model?.name,
+        adSpec,
+        imageBase64: typeof imgData.imageBase64 === 'string' ? imgData.imageBase64 : undefined,
+        imageUrl: typeof imgData.imageUrl === 'string' ? imgData.imageUrl : undefined,
+        mimeType: typeof imgData.mimeType === 'string' ? imgData.mimeType : undefined,
+      }),
+    });
+  } catch {
+    // Non-blocking: generation is still valid if history persistence fails.
+  }
+}
+
 export function useGeneration(): UseGenerationReturn {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -192,6 +224,7 @@ export function useGeneration(): UseGenerationReturn {
       };
 
       setResult(genResult);
+      await persistGenerationHistory(prompt.trim(), format, width, height, adSpec, imgData);
       return genResult;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Generation failed';

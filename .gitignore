@@ -20,4 +20,6 @@ coverage/
 # Local artifacts
 client/ui-before.png
 client/ui-after.png
+server/generations/
+generations/
 .DS_Store

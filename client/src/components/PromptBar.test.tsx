@@ -39,7 +39,7 @@ describe('PromptBar', () => {
     expect(screen.queryByTestId('validation-error')).not.toBeInTheDocument();
   });
 
-  it('calls /api/generate-ad then /api/generate-image with tuned prompt payload', async () => {
+  it('calls ad/image APIs and persists generation history', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
     const adSpec = {
@@ -59,7 +59,8 @@ describe('PromptBar', () => {
 
     fetchSpy
       .mockResolvedValueOnce(new Response(JSON.stringify(adSpec), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ imageUrl: 'http://img.png' }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ imageUrl: 'http://img.png' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ generation: { id: 'gen-1' } }), { status: 201 }));
 
     const onGenerated = vi.fn();
     renderPromptBar(onGenerated);
@@ -67,7 +68,7 @@ describe('PromptBar', () => {
     fireEvent.change(screen.getByTestId('prompt-input'), { target: { value: 'summer sale shoes' } });
     fireEvent.click(screen.getByTestId('generate-button'));
 
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(3));
 
     expect(fetchSpy.mock.calls[0][0]).toBe('/api/generate-ad');
     const adBody = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string);
@@ -81,6 +82,14 @@ describe('PromptBar', () => {
     expect(imageBody.enhancedPrompt).toBe('MODEL RENDER PROMPT');
     expect(imageBody.systemPrompt).toBe('SYSTEM PROMPT');
     expect(imageBody.model).toBe('gemini-3-pro-image-preview');
+
+    expect(fetchSpy.mock.calls[2][0]).toBe('/api/generations');
+    const historyBody = JSON.parse(fetchSpy.mock.calls[2][1]?.body as string);
+    expect(historyBody.prompt).toBe('summer sale shoes');
+    expect(historyBody.format).toBe('square');
+    expect(historyBody.imagePrompt).toBe('base creative brief');
+    expect(historyBody.model).toBe('gemini-3-pro-image-preview');
+    expect(historyBody.imageUrl).toBe('http://img.png');
 
     await waitFor(() => expect(onGenerated).toHaveBeenCalledTimes(1));
   });

@@ -4,6 +4,7 @@ import { CanvasEditor } from './CanvasEditor';
 import { CanvasLoadingOverlay } from './CanvasLoadingOverlay';
 import { ExportDialog } from './ExportDialog';
 import { FormatSelector } from './FormatSelector';
+import { GenerationHistoryPanel } from './GenerationHistoryPanel';
 import { LayersPanel } from './LayersPanel';
 import { PropertiesPanel } from './PropertiesPanel';
 import { PromptBar } from './PromptBar';
@@ -11,7 +12,9 @@ import { SavedAdsPanel } from './SavedAdsPanel';
 import { useFormat } from '../context/FormatContext';
 import { useGenerationState } from '../context/GenerationContext';
 import { useAdComposition } from '../hooks/useAdComposition';
+import type { GenerationResult } from '../hooks/useGeneration';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { useGenerationHistory, type GenerationHistoryItem } from '../hooks/useGenerationHistory';
 import { useSavedAds } from '../hooks/useSavedAds';
 
 export function AppShell() {
@@ -20,9 +23,16 @@ export function AppShell() {
   const [canvas, setCanvas] = useState<Canvas | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
+  const [showGenerations, setShowGenerations] = useState(false);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const { savedAds, saveAd, deleteAd } = useSavedAds();
+  const {
+    generations,
+    isLoading: isHistoryLoading,
+    error: historyError,
+    refresh: refreshHistory,
+  } = useGenerationHistory();
 
   useKeyboardShortcuts();
 
@@ -50,6 +60,19 @@ export function AppShell() {
     });
   }, [canvas, format, saveAd]);
 
+  const handleGenerated = useCallback(async (result: GenerationResult) => {
+    await compose(result);
+    void refreshHistory();
+  }, [compose, refreshHistory]);
+
+  const handleLoadGeneration = useCallback(async (item: GenerationHistoryItem) => {
+    await compose({
+      adSpec: item.adSpec,
+      imageUrl: item.imageUrl,
+    });
+    setShowGenerations(false);
+  }, [compose]);
+
   return (
     <div className="app-shell h-screen w-screen flex flex-col overflow-hidden" data-testid="app-shell">
       <header className="app-topbar h-12 min-h-[48px] px-4" data-testid="top-bar">
@@ -67,6 +90,18 @@ export function AppShell() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setShowGenerations(true);
+              void refreshHistory();
+            }}
+            className="toolbar-button"
+            title="Generation History"
+          >
+            Generations
+            {generations.length > 0 && <span className="badge">{generations.length}</span>}
+          </button>
+
           <button onClick={() => setShowSaved(true)} className="toolbar-button" title="Saved Ads">
             Saved
             {savedAds.length > 0 && <span className="badge">{savedAds.length}</span>}
@@ -139,10 +174,20 @@ export function AppShell() {
         </aside>
       </div>
 
-      <PromptBar onGenerated={compose} />
+      <PromptBar onGenerated={handleGenerated} />
 
       {showExport && <ExportDialog canvas={canvas} onClose={() => setShowExport(false)} />}
       {showSaved && <SavedAdsPanel ads={savedAds} onDelete={deleteAd} onClose={() => setShowSaved(false)} />}
+      {showGenerations && (
+        <GenerationHistoryPanel
+          generations={generations}
+          isLoading={isHistoryLoading}
+          error={historyError}
+          onRefresh={() => void refreshHistory()}
+          onLoad={handleLoadGeneration}
+          onClose={() => setShowGenerations(false)}
+        />
+      )}
     </div>
   );
 }
