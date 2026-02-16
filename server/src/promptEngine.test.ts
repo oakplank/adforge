@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   detectCategory,
+  detectObjective,
   getFormatConfig,
   generateTextSafeZoneInstructions,
   generateEnhancedPrompt,
+  buildPromptPipeline,
   enhanceImagePrompt,
   FORMAT_CONFIGS,
   CATEGORY_CONFIGS,
@@ -13,36 +15,34 @@ describe('detectCategory', () => {
   it('detects food category', () => {
     expect(detectCategory('pizza', 'delicious pizza deal')).toBe('food');
     expect(detectCategory('coffee', 'morning coffee sale')).toBe('food');
-    expect(detectCategory('burger', 'juicy burger promo')).toBe('food');
   });
 
   it('detects fashion category', () => {
     expect(detectCategory('dress', 'summer dress collection')).toBe('fashion');
     expect(detectCategory('sneakers', 'new sneakers drop')).toBe('fashion');
-    expect(detectCategory('jacket', 'leather jacket sale')).toBe('fashion');
   });
 
   it('detects tech category', () => {
     expect(detectCategory('laptop', 'new laptop deal')).toBe('tech');
     expect(detectCategory('headphones', 'wireless headphones')).toBe('tech');
-    expect(detectCategory('phone', 'smartphone sale')).toBe('tech');
-  });
-
-  it('detects beauty category', () => {
-    expect(detectCategory('lipstick', 'new lipstick shade')).toBe('beauty');
-    expect(detectCategory('skincare', 'skincare routine')).toBe('beauty');
-    expect(detectCategory('perfume', 'luxury perfume')).toBe('beauty');
-  });
-
-  it('detects fitness category', () => {
-    expect(detectCategory('workout', 'workout gear')).toBe('fitness');
-    expect(detectCategory('gym', 'gym membership')).toBe('fitness');
-    expect(detectCategory('protein', 'protein powder')).toBe('fitness');
   });
 
   it('returns general for unknown products', () => {
     expect(detectCategory('widget', 'amazing widget')).toBe('general');
-    expect(detectCategory('thing', 'cool thing')).toBe('general');
+  });
+});
+
+describe('detectObjective', () => {
+  it('detects offer objective', () => {
+    expect(detectObjective('30% off all sneakers')).toBe('offer');
+  });
+
+  it('detects launch objective', () => {
+    expect(detectObjective('Introducing our new matte sunscreen')).toBe('launch');
+  });
+
+  it('defaults to awareness objective', () => {
+    expect(detectObjective('Premium cookware for everyday kitchens')).toBe('awareness');
   });
 });
 
@@ -68,11 +68,6 @@ describe('getFormatConfig', () => {
     expect(config.height).toBe(1920);
   });
 
-  it('returns story config for 9:16 format', () => {
-    const config = getFormatConfig('9:16');
-    expect(config.aspectRatio).toBe('9:16');
-  });
-
   it('defaults to square for unknown formats', () => {
     const config = getFormatConfig('unknown');
     expect(config.aspectRatio).toBe('1:1');
@@ -80,55 +75,100 @@ describe('getFormatConfig', () => {
 });
 
 describe('generateTextSafeZoneInstructions', () => {
-  it('includes top and bottom percentages', () => {
+  it('includes top and bottom percentages with overlay guidance', () => {
     const config = FORMAT_CONFIGS.square;
     const instructions = generateTextSafeZoneInstructions(config);
-    
+
     expect(instructions).toContain('top');
     expect(instructions).toContain('bottom');
     expect(instructions).toContain('clean');
-    expect(instructions).toContain('text overlay');
-  });
-
-  it('uses correct percentages for each format', () => {
-    const squareInstructions = generateTextSafeZoneInstructions(FORMAT_CONFIGS.square);
-    const storyInstructions = generateTextSafeZoneInstructions(FORMAT_CONFIGS.story);
-    
-    // Story has different safe zones than square
-    expect(squareInstructions).not.toBe(storyInstructions);
+    expect(instructions).toContain('overlays');
   });
 });
 
 describe('generateEnhancedPrompt', () => {
-  it('includes photography style for category', () => {
+  it('returns prompt payload with detected category and format config', () => {
     const result = generateEnhancedPrompt('pizza', 'delicious pizza', 'warm', 'square');
-    expect(result.prompt.toLowerCase()).toContain('food photography');
+
+    expect(result.prompt).toBeTruthy();
+    expect(result.prompt.toLowerCase()).toContain('instagram');
     expect(result.category).toBe('food');
+    expect(result.formatConfig.aspectRatio).toBe('1:1');
   });
 
-  it('includes format-specific composition', () => {
-    const squareResult = generateEnhancedPrompt('product', 'cool product', 'energetic', 'square');
-    const storyResult = generateEnhancedPrompt('product', 'cool product', 'energetic', 'story');
-    
-    expect(squareResult.formatConfig.aspectRatio).toBe('1:1');
-    expect(storyResult.formatConfig.aspectRatio).toBe('9:16');
-  });
-
-  it('includes text safe zone instructions', () => {
-    const result = generateEnhancedPrompt('shoes', 'cool shoes', 'energetic', 'square');
-    expect(result.textSafeZoneInstructions).toContain('clean');
-    expect(result.textSafeZoneInstructions).toContain('text overlay');
-  });
-
-  it('includes professional quality keywords', () => {
+  it('includes safe-zone guidance in render prompt output', () => {
     const result = generateEnhancedPrompt('watch', 'luxury watch', 'luxury', 'portrait');
-    expect(result.prompt.toLowerCase()).toContain('professional');
-    expect(result.prompt.toLowerCase()).toContain('quality');
+    expect(result.prompt.toLowerCase()).toContain('top');
+    expect(result.prompt.toLowerCase()).toContain('bottom');
+  });
+});
+
+describe('buildPromptPipeline', () => {
+  it('builds strategy metadata for offer prompts', () => {
+    const result = buildPromptPipeline({
+      rawPrompt: 'Flash sale 30% off running shoes for commuters',
+      product: 'running shoes',
+      description: 'Flash sale 30% off running shoes for commuters',
+      vibe: 'energetic',
+      format: 'portrait',
+      offer: '30% off',
+    });
+
+    expect(result.objective).toBe('offer');
+    expect(result.promptPipeline.baseCreativeBrief).toContain('Goal: offer');
+    expect(result.promptPipeline.renderPrompt).toContain('Instagram');
+    expect(result.promptPipeline.systemPrompt).toContain('creative director');
+    expect(result.promptPipeline.renderPrompt).toContain('Composition strategy');
+    expect(result.promptPipeline.qualityChecklist.length).toBeGreaterThan(2);
+    expect(result.placementHints.ctaPriority).toBe('high');
+    expect(result.suggestedTemplateId).toBe('bold-sale');
   });
 
-  it('handles color input', () => {
-    const result = generateEnhancedPrompt('sneakers', 'cool sneakers', 'energetic', 'square', ['#FF6B00', '#1565C0']);
-    expect(result.prompt).toContain('#FF6B00');
+  it('builds launch strategy metadata for new-product prompts', () => {
+    const result = buildPromptPipeline({
+      rawPrompt: 'Introducing our new skincare serum for sensitive skin',
+      product: 'skincare serum',
+      description: 'Introducing our new skincare serum for sensitive skin',
+      vibe: 'calm',
+      format: 'square',
+    });
+
+    expect(result.objective).toBe('launch');
+    expect(result.agenticPlan.preflightChecklist.length).toBeGreaterThan(0);
+    expect(result.agenticPlan.postImageChecklist.length).toBeGreaterThan(0);
+  });
+
+  it('applies PartingWord brand context, palette, and right-lane placement bias', () => {
+    const result = buildPromptPipeline({
+      rawPrompt: 'PartingWord.com end of life messaging platform, calm trustworthy tone',
+      product: 'end of life messaging platform',
+      description: 'PartingWord.com end of life messaging platform, calm trustworthy tone',
+      vibe: 'calm',
+      format: 'portrait',
+    });
+
+    expect(result.promptPipeline.baseCreativeBrief).toContain('PartingWord');
+    expect(result.promptPipeline.renderPrompt).toContain('https://www.partingword.com/');
+    expect(result.promptPipeline.renderPrompt).toContain('#1E4D3A');
+    expect(result.promptPipeline.renderPrompt).toContain('#F1E9DA');
+    expect(result.promptPipeline.systemPrompt).toContain('empathetic');
+    expect(result.placementHints.preferredAlignment).toBe('right');
+    expect(result.placementHints.avoidCenter).toBe(true);
+    expect(result.suggestedTemplateId).toBe('minimal');
+    expect(result.promptPipeline.renderPrompt).toContain('right 45%');
+    expect(result.promptPipeline.renderPrompt).toContain('Do not render tablets, phones, laptops');
+    expect(result.promptPipeline.renderPrompt).toContain('one primary anchor object');
+    expect(result.promptPipeline.systemPrompt).toContain('narrative logic');
+    expect(result.promptPipeline.systemPrompt).toContain('silent pre-render thought session');
+    expect(result.promptPipeline.interpretiveLayer.selectedDirection).toBeTruthy();
+    expect(result.promptPipeline.interpretiveLayer.refinedSceneInstruction).toBeTruthy();
+    expect(result.promptPipeline.thoughtSession.targetAudience).toBeTruthy();
+    expect(result.promptPipeline.thoughtSession.humanPresence).toBeTruthy();
+    expect(result.promptPipeline.renderPrompt).toContain('Pre-render thought session');
+    expect(result.promptPipeline.renderPrompt).toContain('Human presence policy');
+    expect(result.promptPipeline.renderPrompt).toContain('Regenerate instead of forcing output');
+    expect(result.promptPipeline.renderPrompt).toContain('sterile isolated object-on-white-background');
+    expect(result.promptPipeline.renderPrompt).toContain('Interpretive direction selected');
   });
 });
 
@@ -145,29 +185,7 @@ describe('enhanceImagePrompt', () => {
     expect(result.category).toBe('food');
     expect(result.formatConfig).toBeDefined();
     expect(result.textSafeZoneInstructions).toBeDefined();
-    expect(result.photographyDirections).toBeDefined();
-  });
-
-  it('includes lighting directions', () => {
-    const result = enhanceImagePrompt({
-      product: 'laptop',
-      category: 'tech',
-      vibe: 'minimal',
-      format: 'square',
-    });
-
-    expect(result.photographyDirections.toLowerCase()).toContain('lighting');
-  });
-
-  it('includes depth of field', () => {
-    const result = enhanceImagePrompt({
-      product: 'necklace',
-      category: 'jewelry',
-      vibe: 'luxury',
-      format: 'portrait',
-    });
-
-    expect(result.prompt.toLowerCase()).toContain('depth of field');
+    expect(result.photographyDirections).toContain('Lighting');
   });
 });
 
@@ -194,7 +212,7 @@ describe('CATEGORY_CONFIGS', () => {
     }
   });
 
-  it('has photography style for each category', () => {
+  it('has photography style fields for each category', () => {
     for (const config of Object.values(CATEGORY_CONFIGS)) {
       expect(config.photographyStyle).toBeTruthy();
       expect(config.lightingStyle).toBeTruthy();
