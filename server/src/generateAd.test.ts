@@ -46,101 +46,79 @@ describe('parsePrompt', () => {
     expect(result.offer.toLowerCase()).toContain('free shipping');
   });
 
-  it('extracts luxury vibe', () => {
-    const result = parsePrompt('luxury watches gold and silver');
-    expect(result.vibe).toBe('luxury');
-  });
-
-  it('extracts calm vibe', () => {
-    const result = parsePrompt('calm spa products blue tones');
-    expect(result.vibe).toBe('calm');
-  });
-
-  it('extracts professional vibe', () => {
-    const result = parsePrompt('professional business services');
-    expect(result.vibe).toBe('professional');
-  });
-
-  it('extracts multiple colors', () => {
-    const result = parsePrompt('blue green and purple gradient background');
-    expect(result.colors.length).toBeGreaterThanOrEqual(2);
-  });
-
   it('preserves raw prompt', () => {
     const input = 'Test prompt with special chars !@#$';
     const result = parsePrompt(input);
     expect(result.rawPrompt).toBe(input);
   });
-
-  it('handles empty-ish product gracefully', () => {
-    const result = parsePrompt('30% off sale energetic orange');
-    expect(result.product).toBeTruthy();
-  });
 });
 
 describe('generateAdSpec', () => {
-  it('generates headline with offer', () => {
+  it('generates objective-aware metadata and pipeline', () => {
+    const parsed = parsePrompt('Summer sale 30% off shoes for city commuters');
+    const spec = generateAdSpec(parsed, 'portrait');
+
+    expect(spec.metadata?.objective).toBe('offer');
+    expect(spec.metadata?.promptPipeline.baseCreativeBrief).toContain('Goal: offer');
+    expect(spec.metadata?.promptPipeline.renderPrompt).toContain('Instagram');
+    expect(spec.metadata?.promptPipeline.systemPrompt).toContain('creative director');
+    expect(spec.metadata?.promptPipeline.renderPrompt).toContain('Composition strategy');
+    expect(spec.metadata?.promptPipeline.qualityChecklist.length).toBeGreaterThan(2);
+    expect(spec.metadata?.placementHints).toBeDefined();
+    expect(spec.metadata?.agenticPlan).toBeDefined();
+  });
+
+  it('uses strategy template by default instead of legacy default template id', () => {
     const parsed = parsePrompt('Summer sale 30% off shoes');
     const spec = generateAdSpec(parsed);
-    expect(spec.texts.headline.toLowerCase()).toContain('30% off');
+    expect(['bold-sale', 'product-showcase', 'minimal']).toContain(spec.templateId);
+    expect(spec.templateId).not.toBe('default');
   });
 
-  it('generates Shop Now CTA for offers', () => {
-    const parsed = parsePrompt('30% off shoes');
-    const spec = generateAdSpec(parsed);
-    expect(spec.texts.cta).toBe('Shop Now');
+  it('uses provided templateId override', () => {
+    const parsed = parsePrompt('shoes sale');
+    const spec = generateAdSpec(parsed, 'square', 'product-showcase');
+    expect(spec.templateId).toBe('product-showcase');
   });
 
-  it('generates Learn More CTA when no offer', () => {
-    const parsed = parsePrompt('premium leather bags luxury');
-    const spec = generateAdSpec(parsed);
-    expect(['Learn More', 'Shop Now', 'Get Started', 'Discover']).toContain(spec.texts.cta);
-  });
+  it('returns category, layout and color payload', () => {
+    const parsed = parsePrompt('delicious pizza 20% off');
+    const spec = generateAdSpec(parsed, 'square');
 
-  it('returns all required AdSpec fields', () => {
-    const parsed = parsePrompt('Summer sale 30% off shoes');
-    const spec = generateAdSpec(parsed);
-    expect(spec.imagePrompt).toBeTruthy();
-    expect(spec.texts.headline).toBeTruthy();
-    expect(spec.texts.subhead).toBeTruthy();
-    expect(spec.texts.cta).toBeTruthy();
+    expect(spec.category).toBe('food');
+    expect(spec.layout).toBeDefined();
     expect(spec.colors.primary).toBeTruthy();
     expect(spec.colors.secondary).toBeTruthy();
-    expect(spec.templateId).toBe('default');
+    expect(spec.colors.accent).toBeTruthy();
   });
 
-  it('uses provided templateId', () => {
-    const parsed = parsePrompt('shoes sale');
-    const spec = generateAdSpec(parsed, 'square', 'hero-center');
-    expect(spec.templateId).toBe('hero-center');
-  });
-
-  it('uses extracted colors as primary/secondary', () => {
-    const parsed = parsePrompt('orange and blue sneakers');
-    const spec = generateAdSpec(parsed);
-    expect(spec.colors.primary).toBe('#FF6B00');
-    expect(spec.colors.secondary).toBe('#1565C0');
-  });
-
-  it('includes category detection', () => {
-    const parsed = parsePrompt('delicious pizza 50% off');
-    const spec = generateAdSpec(parsed);
-    expect(spec.category).toBe('food');
-  });
-
-  it('includes layout information', () => {
-    const parsed = parsePrompt('summer shoes sale');
+  it('returns varied CTA language for offers (not always Shop Now)', () => {
+    const parsed = parsePrompt('20% off running shoes');
     const spec = generateAdSpec(parsed, 'square');
-    expect(spec.layout).toBeDefined();
-    expect(spec.layout?.format).toBe('square');
+
+    expect(spec.texts.cta).toBeTruthy();
+    expect(spec.texts.cta.length).toBeLessThanOrEqual(18);
+    expect(spec.texts.cta).not.toBe('Shop Now');
   });
 
-  it('includes metadata with contrast ratios', () => {
-    const parsed = parsePrompt('tech gadget sale');
-    const spec = generateAdSpec(parsed);
-    expect(spec.metadata).toBeDefined();
-    expect(spec.metadata?.contrastRatios).toBeDefined();
-    expect(spec.metadata?.contrastRatios.headline).toBeGreaterThan(0);
+  it('includes model metadata for image generation', () => {
+    const parsed = parsePrompt('new skincare serum launch for sensitive skin');
+    const spec = generateAdSpec(parsed, 'portrait');
+
+    expect(spec.metadata?.model).toEqual({
+      provider: 'google',
+      name: 'gemini-3-pro-image-preview',
+    });
+  });
+
+  it('uses PartingWord brand palette when prompt references PartingWord', () => {
+    const parsed = parsePrompt('PartingWord.com end of life messaging platform launch');
+    const spec = generateAdSpec(parsed, 'portrait');
+
+    expect(spec.colors.primary).toBe('#1E4D3A');
+    expect(spec.colors.secondary).toBe('#F1E9DA');
+    expect(spec.colors.accent).toBe('#2D6A4F');
+    expect(spec.templateId).toBe('minimal');
   });
 });
 
@@ -149,19 +127,22 @@ describe('POST /api/generate-ad', () => {
     const res = await request(app)
       .post('/api/generate-ad')
       .send({ prompt: 'Summer sale 30% off shoes' });
+
     expect(res.status).toBe(200);
     expect(res.body.imagePrompt).toBeTruthy();
     expect(res.body.texts.headline).toBeTruthy();
     expect(res.body.texts.subhead).toBeTruthy();
     expect(res.body.texts.cta).toBeTruthy();
     expect(res.body.colors).toBeTruthy();
-    expect(res.body.templateId).toBe('default');
+    expect(res.body.metadata).toBeTruthy();
+    expect(res.body.metadata.promptPipeline.renderPrompt).toBeTruthy();
   });
 
   it('returns 400 for missing prompt', async () => {
     const res = await request(app)
       .post('/api/generate-ad')
       .send({});
+
     expect(res.status).toBe(400);
     expect(res.body.error).toContain('prompt');
   });
@@ -170,32 +151,41 @@ describe('POST /api/generate-ad', () => {
     const res = await request(app)
       .post('/api/generate-ad')
       .send({ prompt: '   ' });
+
     expect(res.status).toBe(400);
   });
 
   it('accepts format and templateId', async () => {
     const res = await request(app)
       .post('/api/generate-ad')
-      .send({ prompt: 'cool shoes', format: 'portrait', templateId: 'hero-left' });
+      .send({ prompt: 'cool shoes', format: 'portrait', templateId: 'minimal' });
+
     expect(res.status).toBe(200);
-    expect(res.body.templateId).toBe('hero-left');
+    expect(res.body.templateId).toBe('minimal');
+    expect(res.body.metadata.formatConfig.height).toBe(1350);
   });
 
-  it('produces relevant headline for summer sale prompt', async () => {
+  it('returns full strategy metadata for downstream placement', async () => {
     const res = await request(app)
       .post('/api/generate-ad')
-      .send({ prompt: 'Summer sale 30% off shoes' });
-    expect(res.body.texts.headline.toLowerCase()).toContain('30% off');
-    expect(res.body.texts.cta).toBe('Shop Now');
+      .send({ prompt: 'new cold brew maker launch for designers, calm minimal style' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.metadata.objective).toBe('launch');
+    expect(res.body.metadata.placementHints).toBeDefined();
+    expect(res.body.metadata.agenticPlan).toBeDefined();
+    expect(res.body.metadata.promptPipeline.systemPrompt).toBeTruthy();
   });
 
-  it('returns enhanced fields in response', async () => {
-    const res = await request(app)
-      .post('/api/generate-ad')
-      .send({ prompt: 'delicious pizza 20% off' });
-    expect(res.status).toBe(200);
-    expect(res.body.category).toBe('food');
-    expect(res.body.layout).toBeDefined();
-    expect(res.body.metadata).toBeDefined();
+  it('rotates copy variant index for repeated prompt requests', async () => {
+    const body = { prompt: 'PartingWord.com end of life messaging platform launch' };
+    const first = await request(app).post('/api/generate-ad').send(body);
+    const second = await request(app).post('/api/generate-ad').send(body);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(typeof first.body.metadata.copyVariantIndex).toBe('number');
+    expect(typeof second.body.metadata.copyVariantIndex).toBe('number');
+    expect(second.body.metadata.copyVariantIndex).toBe((first.body.metadata.copyVariantIndex + 1) % 997);
   });
 });

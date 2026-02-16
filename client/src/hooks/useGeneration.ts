@@ -56,6 +56,8 @@ export interface AdSpec {
       provider: 'google';
       name: string;
     };
+    copyVariantIndex?: number;
+    textTreatmentHintId?: string;
   };
 }
 

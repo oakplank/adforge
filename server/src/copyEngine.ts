@@ -18,6 +18,7 @@ export interface CopyInput {
   category: string;
   objective?: Objective;
   rawPrompt?: string;
+  variantOffset?: number;
 }
 
 export interface CopyOutput {
@@ -76,6 +77,10 @@ function shortProduct(product: string): string {
 function objectiveFromInput(input: CopyInput): Objective {
   if (input.objective) return input.objective;
   return hasDiscount(input.offer) ? 'offer' : 'awareness';
+}
+
+function variantSalt(input: CopyInput): string {
+  return String(input.variantOffset ?? 0);
 }
 
 function isCompassionateContext(input: CopyInput): boolean {
@@ -158,7 +163,14 @@ function formulaCandidates(input: CopyInput, objective: Objective): HeadlineForm
 
 function selectFormula(input: CopyInput): HeadlineFormula {
   const objective = objectiveFromInput(input);
-  const seed = hashSeed([input.product, input.offer ?? '', input.vibe, input.category, objective]);
+  const seed = hashSeed([
+    input.product,
+    input.offer ?? '',
+    input.vibe,
+    input.category,
+    objective,
+    variantSalt(input),
+  ]);
   return pickVariant(formulaCandidates(input, objective), seed);
 }
 
@@ -309,20 +321,52 @@ function ctaCandidates(input: CopyInput, objective: Objective): string[] {
 
 function selectCta(input: CopyInput): string {
   const objective = objectiveFromInput(input);
-  const seed = hashSeed([input.product, input.offer ?? '', input.category, objective, 'cta']);
+  const seed = hashSeed([
+    input.product,
+    input.offer ?? '',
+    input.category,
+    objective,
+    'cta',
+    variantSalt(input),
+  ]);
   return pickVariant(ctaCandidates(input, objective), seed);
 }
 
 function compassionateCopy(input: CopyInput): CopyOutput {
   const objective = objectiveFromInput(input);
-  const seed = hashSeed([input.product, input.rawPrompt ?? '', input.vibe, input.category, objective, 'compassion']);
+  const variant = Math.abs(input.variantOffset ?? 0);
+  const seed = hashSeed([
+    input.product,
+    input.rawPrompt ?? '',
+    input.vibe,
+    input.category,
+    objective,
+    'compassion',
+  ]);
   const theme = detectCompassionTheme(input);
 
   const headlinesByTheme: Record<CompassionTheme, Record<Objective, string[]>> = {
     core: {
-      offer: ['A Caring Way to Plan Ahead', 'Messages That Hold What Matters', 'Your Voice, Preserved With Care'],
-      launch: ['A Gentle Way to Leave Words', 'Messages for the People You Love', 'Your Voice, Preserved With Care'],
-      awareness: ['Messages for the People You Love', 'Plan Meaningful Messages Ahead', 'When Words Matter Most'],
+      offer: [
+        'A Caring Way to Plan Ahead',
+        'Messages That Hold What Matters',
+        'Your Voice, Preserved With Care',
+        'Leave Words That Last',
+      ],
+      launch: [
+        'A Gentle Way to Leave Words',
+        'Messages for the People You Love',
+        'Your Voice, Preserved With Care',
+        'Prepare Messages with Heart',
+        'Leave Words That Last',
+      ],
+      awareness: [
+        'Messages for the People You Love',
+        'Plan Meaningful Messages Ahead',
+        'When Words Matter Most',
+        'Your Words Can Reach Later',
+        'Keep Meaningful Notes Ready',
+      ],
     },
     caregiver: {
       offer: ['Care Notes, Ready in Time', 'Guidance for Hard Moments', 'Clarity for Family Care'],
@@ -458,9 +502,9 @@ function compassionateCopy(input: CopyInput): CopyOutput {
 
   const ctasByTheme: Record<CompassionTheme, Record<Objective, string[]>> = {
     core: {
-      offer: ['Start a Message', 'Plan with Care', 'Write a Message'],
-      launch: ['Write a Message', 'See the Process', 'Start with Care'],
-      awareness: ['Learn the Process', 'Start a Message', 'See How It Works'],
+      offer: ['Start a Message', 'Plan with Care', 'Write a Message', 'Begin Your Plan'],
+      launch: ['Write a Message', 'See the Process', 'Start with Care', 'Begin Your Plan'],
+      awareness: ['Learn the Process', 'Start a Message', 'See How It Works', 'Explore the Flow'],
     },
     caregiver: {
       offer: ['Guide Loved Ones', 'Start Care Notes', 'Plan with Care'],
@@ -493,9 +537,65 @@ function compassionateCopy(input: CopyInput): CopyOutput {
   const themeSubheads = subheadsByTheme[theme][objective];
   const themeCtas = ctasByTheme[theme][objective];
 
-  const headline = pickWithinLimit(themeHeadlines, seed, CHAR_LIMITS.headline);
-  const subhead = pickWithinLimit(themeSubheads, seed + 3, CHAR_LIMITS.subhead);
-  const cta = pickWithinLimit(themeCtas, seed + 5, CHAR_LIMITS.cta);
+  const identityByTheme: Record<CompassionTheme, string[]> = {
+    core: [
+      'PartingWord is a secure legacy messaging app.',
+      'PartingWord stores future messages safely.',
+    ],
+    caregiver: [
+      'PartingWord keeps care guidance organized.',
+      'PartingWord stores practical caregiver notes.',
+    ],
+    parents: [
+      'PartingWord helps parents leave future letters.',
+      'PartingWord preserves messages for milestones.',
+    ],
+    voice: [
+      'PartingWord keeps voice and written notes together.',
+      'PartingWord preserves spoken legacy messages.',
+    ],
+    faith: [
+      'PartingWord preserves values and blessings.',
+      'PartingWord keeps faith-rooted messages.',
+    ],
+    practical: [
+      'PartingWord organizes practical guidance securely.',
+      'PartingWord stores clear family instructions.',
+    ],
+  };
+
+  const valueByTheme: Record<CompassionTheme, string[]> = {
+    core: ['Loved ones receive your words at the right time.', 'Your family can hold onto your voice with clarity.'],
+    caregiver: ['Family coordinators get clear direction fast.', 'Caregivers can act with confidence in hard moments.'],
+    parents: ['Children keep your voice for future milestones.', 'Family keeps guidance for moments that matter.'],
+    voice: ['Loved ones keep your tone and presence.', 'Your voice stays present when family needs it most.'],
+    faith: ['Family keeps words of comfort and conviction.', 'Loved ones receive reassurance rooted in your values.'],
+    practical: ['Family gets clear steps, context, and care.', 'Future decisions become simpler and less stressful.'],
+  };
+
+  const bridgeByObjective: Record<Objective, string[]> = {
+    offer: ['Start your plan today.', 'Begin with one message.'],
+    launch: ['See how simple it is to start.', 'Create your first message in minutes.'],
+    awareness: ['Explore how it works.', 'Start when you are ready.'],
+  };
+
+  const identity = pickVariant(identityByTheme[theme], seed + 9 + variant);
+  const value = pickVariant(valueByTheme[theme], seed + 11 + variant);
+  const bridge = pickVariant(bridgeByObjective[objective], seed + 13 + variant);
+
+  const subhead = pickWithinLimit(
+    [
+      pickVariant(themeSubheads, seed + 3 + variant),
+      identity,
+      value,
+      `${identity} ${bridge}`,
+      `${value} ${bridge}`,
+    ],
+    seed + 3 + variant * 3,
+    CHAR_LIMITS.subhead
+  );
+  const headline = pickWithinLimit(themeHeadlines, seed + variant * 7, CHAR_LIMITS.headline);
+  const cta = pickWithinLimit(themeCtas, seed + 5 + variant * 7, CHAR_LIMITS.cta);
 
   return {
     headline,
@@ -512,7 +612,14 @@ export function generateCopy(input: CopyInput): CopyOutput {
 
   const objective = objectiveFromInput(input);
   const formula = selectFormula(input);
-  const seed = hashSeed([input.product, input.offer ?? '', input.vibe, input.category, formula]);
+  const seed = hashSeed([
+    input.product,
+    input.offer ?? '',
+    input.vibe,
+    input.category,
+    formula,
+    variantSalt(input),
+  ]);
   let headline = generateHeadline(formula, input, seed);
   if (
     objective === 'offer' &&

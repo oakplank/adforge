@@ -21,6 +21,30 @@ describe('generateCopy', () => {
     expect(a).toEqual(b);
   });
 
+  it('rotates output when variantOffset changes', () => {
+    const base = generateCopy({
+      product: 'PartingWord',
+      vibe: 'calm',
+      category: 'general',
+      objective: 'launch',
+      rawPrompt: 'PartingWord.com end of life messaging platform',
+      variantOffset: 0,
+    });
+
+    const variant = generateCopy({
+      product: 'PartingWord',
+      vibe: 'calm',
+      category: 'general',
+      objective: 'launch',
+      rawPrompt: 'PartingWord.com end of life messaging platform',
+      variantOffset: 1,
+    });
+
+    expect(`${base.headline}|${base.subhead}|${base.cta}`).not.toBe(
+      `${variant.headline}|${variant.subhead}|${variant.cta}`
+    );
+  });
+
   it('generates offer-aware headline when objective is offer', () => {
     const result = generateCopy({
       product: 'shoes',
@@ -115,7 +139,7 @@ describe('generateCopy', () => {
     expect(result.headline.toLowerCase()).toMatch(/messages|words|voice|meaningful/);
     expect(result.subhead.toLowerCase()).toMatch(/legacy|loved|message|end-of-life|trusted|future|guidance|memories|love/);
     expect(result.cta.length).toBeLessThanOrEqual(CHAR_LIMITS.cta);
-    expect(result.cta.toLowerCase()).toMatch(/message|process|care|write|learn|start/);
+    expect(result.cta.toLowerCase()).toMatch(/message|process|care|write|learn|start|plan|begin/);
   });
 
   it('avoids discount-store CTA language in compassionate mode', () => {

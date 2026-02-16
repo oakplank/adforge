@@ -14,6 +14,14 @@ import {
 } from './layoutEngine.js';
 
 const DEFAULT_IMAGE_MODEL = process.env.NANO_BANANA_MODEL || 'gemini-3-pro-image-preview';
+const promptVariantMap = new Map<string, number>();
+const TEXT_TREATMENT_HINTS = [
+  'editorial-soft',
+  'quiet-minimal',
+  'serif-story',
+  'campaign-outline',
+  'warm-label',
+] as const;
 
 const VIBE_COLOR_MAP: Record<string, { primary: string; secondary: string; accent: string }> = {
   energetic: { primary: '#FF6B00', secondary: '#FF9500', accent: '#FFD600' },
@@ -71,6 +79,8 @@ export interface AdSpec {
       cta: number;
     };
     formatConfig: FormatConfig;
+    copyVariantIndex: number;
+    textTreatmentHintId: string;
   };
 }
 
@@ -135,7 +145,29 @@ export function parsePrompt(prompt: string): ParsedPrompt {
   return { product: product || 'product', offer, vibe, colors, rawPrompt: prompt };
 }
 
-export function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId?: string): AdSpec {
+function resolveTextTreatmentHint(objective: Objective, variantOffset: number): string {
+  const seed = variantOffset % TEXT_TREATMENT_HINTS.length;
+  const hint = TEXT_TREATMENT_HINTS[seed];
+  if (objective === 'offer' && hint === 'quiet-minimal') {
+    return 'campaign-outline';
+  }
+  return hint;
+}
+
+function nextVariantIndex(prompt: string, format?: string, templateId?: string): number {
+  const key = `${prompt.toLowerCase()}|${format || 'square'}|${templateId || 'auto'}`;
+  const current = promptVariantMap.get(key) ?? -1;
+  const next = (current + 1) % 997;
+  promptVariantMap.set(key, next);
+  return next;
+}
+
+export function generateAdSpec(
+  parsed: ParsedPrompt,
+  format?: string,
+  templateId?: string,
+  variantOffset = 0
+): AdSpec {
   const { product, offer, vibe, colors, rawPrompt } = parsed;
   const resolvedFormat = format ?? 'square';
   const isPartingWordPrompt = /partingword|partingword\.com|parting word|end[\s-]?of[\s-]?life messaging/i.test(rawPrompt);
@@ -159,6 +191,7 @@ export function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId
     category: strategy.category,
     objective: strategy.objective,
     rawPrompt,
+    variantOffset,
   });
 
   const copyValidation = validateCopy(copy);
@@ -197,6 +230,7 @@ export function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId
   adColors.text = layout.textColors.headline;
 
   // 5. Build AdSpec
+  const textTreatmentHintId = resolveTextTreatmentHint(strategy.objective, variantOffset);
   return {
     imagePrompt: strategy.promptPipeline.baseCreativeBrief,
     texts: {
@@ -220,6 +254,8 @@ export function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId
       headlineFormula: copy.formula,
       contrastRatios: layout.contrastRatios,
       formatConfig: strategy.formatConfig as FormatConfig,
+      copyVariantIndex: variantOffset,
+      textTreatmentHintId,
     },
   };
 }
@@ -235,8 +271,10 @@ export function createGenerateAdRouter(): Router {
       return;
     }
 
-    const parsed = parsePrompt(prompt.trim());
-    const adSpec = generateAdSpec(parsed, format, templateId);
+    const normalizedPrompt = prompt.trim();
+    const parsed = parsePrompt(normalizedPrompt);
+    const variantOffset = nextVariantIndex(normalizedPrompt, format, templateId);
+    const adSpec = generateAdSpec(parsed, format, templateId, variantOffset);
     res.json(adSpec);
   });
 

@@ -13,6 +13,152 @@ export interface ComposeOptions {
   canvasHeight: number;
 }
 
+interface TextTreatmentProfile {
+  id: string;
+  headlineFont: string;
+  subheadFont: string;
+  ctaFont: string;
+  uppercaseHeadline: boolean;
+  headlineTight: boolean;
+  subheadItalic: boolean;
+  scrimMode: 'none' | 'minimal' | 'soft' | 'solid';
+  scrimRadius: number;
+  scrimOpacityScale: number;
+  ctaMode: 'pill' | 'outline' | 'ghost' | 'label';
+  ctaRadius: number;
+  ctaFillAlpha: number;
+  ctaStrokeAlpha: number;
+  ctaUppercase: boolean;
+  ctaPrefix?: string;
+}
+
+const TEXT_TREATMENTS: TextTreatmentProfile[] = [
+  {
+    id: 'editorial-soft',
+    headlineFont: 'Space Grotesk',
+    subheadFont: 'Manrope',
+    ctaFont: 'Space Grotesk',
+    uppercaseHeadline: false,
+    headlineTight: true,
+    subheadItalic: false,
+    scrimMode: 'minimal',
+    scrimRadius: 18,
+    scrimOpacityScale: 0.82,
+    ctaMode: 'label',
+    ctaRadius: 22,
+    ctaFillAlpha: 0.52,
+    ctaStrokeAlpha: 0,
+    ctaUppercase: false,
+  },
+  {
+    id: 'quiet-minimal',
+    headlineFont: 'Manrope',
+    subheadFont: 'Manrope',
+    ctaFont: 'Manrope',
+    uppercaseHeadline: false,
+    headlineTight: false,
+    subheadItalic: false,
+    scrimMode: 'none',
+    scrimRadius: 8,
+    scrimOpacityScale: 0.72,
+    ctaMode: 'ghost',
+    ctaRadius: 10,
+    ctaFillAlpha: 0,
+    ctaStrokeAlpha: 0,
+    ctaUppercase: false,
+    ctaPrefix: '→',
+  },
+  {
+    id: 'serif-story',
+    headlineFont: 'DM Serif Display',
+    subheadFont: 'Manrope',
+    ctaFont: 'Space Grotesk',
+    uppercaseHeadline: false,
+    headlineTight: false,
+    subheadItalic: true,
+    scrimMode: 'minimal',
+    scrimRadius: 22,
+    scrimOpacityScale: 0.9,
+    ctaMode: 'ghost',
+    ctaRadius: 8,
+    ctaFillAlpha: 0.62,
+    ctaStrokeAlpha: 0,
+    ctaUppercase: false,
+  },
+  {
+    id: 'campaign-outline',
+    headlineFont: 'Space Grotesk',
+    subheadFont: 'Manrope',
+    ctaFont: 'Space Grotesk',
+    uppercaseHeadline: true,
+    headlineTight: true,
+    subheadItalic: false,
+    scrimMode: 'minimal',
+    scrimRadius: 12,
+    scrimOpacityScale: 1.1,
+    ctaMode: 'outline',
+    ctaRadius: 16,
+    ctaFillAlpha: 0.1,
+    ctaStrokeAlpha: 0.8,
+    ctaUppercase: true,
+  },
+  {
+    id: 'warm-label',
+    headlineFont: 'Playfair Display',
+    subheadFont: 'Manrope',
+    ctaFont: 'Space Grotesk',
+    uppercaseHeadline: false,
+    headlineTight: false,
+    subheadItalic: false,
+    scrimMode: 'minimal',
+    scrimRadius: 28,
+    scrimOpacityScale: 0.86,
+    ctaMode: 'ghost',
+    ctaRadius: 14,
+    ctaFillAlpha: 0.68,
+    ctaStrokeAlpha: 0,
+    ctaUppercase: false,
+  },
+];
+
+function hashString(input: string): number {
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+function resolveTextTreatment(result: GenerationResult): TextTreatmentProfile {
+  const objective = result.adSpec.metadata?.objective || 'awareness';
+  const variantIndex = result.adSpec.metadata?.copyVariantIndex ?? 0;
+  const hintedId = result.adSpec.metadata?.textTreatmentHintId;
+  if (hintedId) {
+    const hinted = TEXT_TREATMENTS.find((candidate) => candidate.id === hintedId);
+    if (hinted) return hinted;
+  }
+  const key = [
+    result.adSpec.texts.headline,
+    result.adSpec.texts.subhead,
+    result.adSpec.texts.cta,
+    objective,
+    String(variantIndex),
+  ].join('|');
+  const index = hashString(key) % TEXT_TREATMENTS.length;
+  const objectiveProfiles =
+    objective === 'offer'
+      ? ['campaign-outline', 'editorial-soft', 'warm-label']
+      : ['quiet-minimal', 'serif-story', 'warm-label', 'editorial-soft'];
+  const objectiveFiltered = TEXT_TREATMENTS.filter((profile) =>
+    objectiveProfiles.includes(profile.id)
+  );
+  if (objectiveFiltered.length > 0) {
+    return objectiveFiltered[index % objectiveFiltered.length];
+  }
+
+  return TEXT_TREATMENTS[index];
+}
+
 function buildTextStyle(slot: MappedSlot, textColor: string): TextStyle {
   return {
     fontFamily: slot.style.fontFamily || 'Space Grotesk',
@@ -107,6 +253,32 @@ function toPixels(
   };
 }
 
+function estimateTextboxWidth(
+  text: string,
+  fontSize: number,
+  laneWidth: number,
+  role: 'headline' | 'subhead' | 'cta'
+): number {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  const charsPerLine = role === 'headline' ? 16 : role === 'subhead' ? 26 : 18;
+  const avgCharWidth = role === 'headline' ? 0.56 : role === 'subhead' ? 0.5 : 0.58;
+  const estimated = (normalized.length / charsPerLine) * fontSize * charsPerLine * avgCharWidth;
+  const minWidth = laneWidth * (role === 'headline' ? 0.58 : role === 'subhead' ? 0.52 : 0.34);
+  const maxWidth = laneWidth * (role === 'cta' ? 0.92 : 1);
+  return clamp(estimated, minWidth, maxWidth);
+}
+
+function positionByAlignment(
+  laneLeft: number,
+  laneWidth: number,
+  contentWidth: number,
+  align: 'left' | 'center' | 'right'
+): number {
+  if (align === 'center') return laneLeft + (laneWidth - contentWidth) / 2;
+  if (align === 'right') return laneLeft + laneWidth - contentWidth;
+  return laneLeft;
+}
+
 function refreshTextboxMetrics(textbox: Textbox): void {
   const target = textbox as Textbox & { initDimensions?: () => void; setCoords: () => void };
   target.initDimensions?.();
@@ -199,22 +371,39 @@ function addScrimIfNeeded(
   label: string,
   block: PlacementTextBlock | PlacementCtaBlock,
   canvasWidth: number,
-  canvasHeight: number
+  canvasHeight: number,
+  options?: {
+    mode?: TextTreatmentProfile['scrimMode'];
+    radius?: number;
+    opacityScale?: number;
+  }
 ) {
-  if (!block.scrim.enabled) return null;
+  const mode = options?.mode || 'soft';
+  if (mode === 'none') return null;
+  if (!block.scrim.enabled && mode === 'minimal') return null;
+  if (!block.scrim.enabled && mode === 'soft') return null;
 
   const blockPx = toPixels(block, canvasWidth, canvasHeight);
   const padX = block.scrim.padding * canvasWidth;
   const padY = block.scrim.padding * canvasHeight;
+  const opacityScale = options?.opacityScale ?? 1;
+  const baseOpacity = clamp(block.scrim.opacity * opacityScale, 0.12, 0.75);
+  const fillOpacity =
+    mode === 'minimal'
+      ? clamp(baseOpacity * 0.72, 0.1, 0.4)
+      : mode === 'solid'
+        ? clamp(baseOpacity * 1.2, 0.28, 0.82)
+        : baseOpacity;
+  const radius = options?.radius ?? 14;
 
   const scrim = new Rect({
     left: blockPx.left - padX,
     top: blockPx.top - padY,
     width: blockPx.width + padX * 2,
     height: blockPx.height + padY * 2,
-    fill: hexToRgba(block.scrim.color, block.scrim.opacity),
-    rx: 14,
-    ry: 14,
+    fill: hexToRgba(block.scrim.color, fillOpacity),
+    rx: radius,
+    ry: radius,
     selectable: false,
     evented: false,
   });
@@ -242,21 +431,65 @@ function getScaledBounds(textbox: Textbox): { left: number; top: number; width: 
   };
 }
 
+function measureTextboxContentWidth(textbox: Textbox): number {
+  const target = textbox as Textbox & {
+    getLineWidth?: (lineIndex: number) => number;
+    _textLines?: unknown[];
+  };
+  if (typeof target.getLineWidth === 'function' && Array.isArray(target._textLines)) {
+    let max = 0;
+    for (let i = 0; i < target._textLines.length; i += 1) {
+      max = Math.max(max, target.getLineWidth(i));
+    }
+    return max * (textbox.scaleX || 1);
+  }
+
+  return (textbox.width || 0) * (textbox.scaleX || 1);
+}
+
 function linkBackdropToTextbox(
   canvas: Canvas,
   textbox: Textbox,
   backdrop: Rect,
   padX: number,
   padY: number,
-  minHeight = 0
+  minHeight = 0,
+  options?: {
+    fitToText?: boolean;
+    minWidth?: number;
+    maxWidth?: number;
+  }
 ) {
   const syncBackdrop = () => {
     refreshTextboxMetrics(textbox);
     const bounds = getScaledBounds(textbox);
+    const align = (textbox.textAlign || 'left') as 'left' | 'center' | 'right';
+    const contentWidth = measureTextboxContentWidth(textbox);
+    const fitToText = options?.fitToText ?? false;
+    const maxWidth = options?.maxWidth ?? bounds.width + padX * 2;
+    const minWidth = options?.minWidth ?? Math.min(bounds.width, 80);
+    const desiredWidth = fitToText
+      ? clamp(contentWidth + padX * 2, minWidth, maxWidth)
+      : bounds.width + padX * 2;
+    const textBoxContentLeft = positionByAlignment(
+      bounds.left,
+      bounds.width,
+      Math.min(contentWidth, bounds.width),
+      align
+    );
+    const left = fitToText
+      ? positionByAlignment(
+          textBoxContentLeft - padX,
+          Math.min(contentWidth + padX * 2, bounds.width + padX * 2),
+          desiredWidth,
+          align
+        )
+      : bounds.left - padX;
+
     backdrop.set({
-      left: bounds.left - padX,
+      left,
       top: bounds.top - padY,
-      width: bounds.width + padX * 2,
+      width: desiredWidth,
       height: Math.max(bounds.height + padY * 2, minHeight),
     });
     backdrop.setCoords();
@@ -311,6 +544,7 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
     const placementPlan: PlacementPlan | undefined = adSpec.metadata?.placementPlan;
     const preferredAlignment =
       adSpec.metadata?.placementHints?.preferredAlignment || 'auto';
+    const textTreatment = resolveTextTreatment(result);
 
     const bgSlot = slots.find((s) => s.type === 'background');
     if (bgSlot) {
@@ -350,33 +584,68 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
         'Headline',
         placementPlan.headline,
         canvasWidth,
-        canvasHeight
+        canvasHeight,
+        {
+          mode: textTreatment.scrimMode,
+          radius: textTreatment.scrimRadius,
+          opacityScale: textTreatment.scrimOpacityScale,
+        }
       );
       const headlinePx = toPixels(placementPlan.headline, canvasWidth, canvasHeight);
       const headlineSize = clamp(Math.round(headlinePx.height * 0.58), 34, formatId === 'story' ? 112 : 88);
-      const headlineTextbox = new Textbox(adSpec.texts.headline, {
-        left: headlinePx.left,
+      const headlineText = textTreatment.uppercaseHeadline
+        ? adSpec.texts.headline.toUpperCase()
+        : adSpec.texts.headline;
+      const headlineWidth = estimateTextboxWidth(
+        headlineText,
+        headlineSize,
+        headlinePx.width,
+        'headline'
+      );
+      const headlineLeft = positionByAlignment(
+        headlinePx.left,
+        headlinePx.width,
+        headlineWidth,
+        placementPlan.headline.align
+      );
+      const headlineTextbox = new Textbox(headlineText, {
+        left: headlineLeft,
         top: headlinePx.top,
-        width: headlinePx.width,
+        width: headlineWidth,
         fontSize: headlineSize,
-        fontFamily: headlineBaseStyle.fontFamily,
-        fontWeight: 'bold',
+        fontFamily: textTreatment.headlineFont,
+        fontWeight: textTreatment.headlineFont === 'DM Serif Display' || textTreatment.headlineFont === 'Playfair Display'
+          ? '700'
+          : '800',
         fill: resolveBlockTextColor(
           placementPlan.headline,
           placementPlan.headline.color || headlineBaseStyle.fill
         ),
         textAlign: placementPlan.headline.align,
-        lineHeight: 1.03,
+        lineHeight: textTreatment.headlineTight ? 1.02 : 1.1,
       });
       fitTextboxToHeight(headlineTextbox, headlinePx.height, 26, 2);
-      trimTextToHeight(headlineTextbox, adSpec.texts.headline, headlinePx.height);
+      trimTextToHeight(headlineTextbox, headlineText, headlinePx.height);
       canvas.add(headlineTextbox);
       if (headlineScrim) {
-        linkBackdropToTextbox(canvas, headlineTextbox, headlineScrim.scrim, headlineScrim.padX, headlineScrim.padY);
+        linkBackdropToTextbox(
+          canvas,
+          headlineTextbox,
+          headlineScrim.scrim,
+          headlineScrim.padX,
+          headlineScrim.padY,
+          0,
+          {
+            fitToText: true,
+            minWidth: headlinePx.width * 0.44,
+            maxWidth: headlinePx.width + headlineScrim.padX * 2,
+          }
+        );
       }
       const headlineLayerId = addLayer({ type: 'text', name: 'Headline', fabricObject: headlineTextbox });
       useLayerStore.getState().updateTextStyle(headlineLayerId, {
         ...headlineBaseStyle,
+        fontFamily: textTreatment.headlineFont,
         fontSize: headlineTextbox.fontSize || headlineSize,
         fill: resolveBlockTextColor(
           placementPlan.headline,
@@ -392,7 +661,12 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
         'Subhead',
         placementPlan.subhead,
         canvasWidth,
-        canvasHeight
+        canvasHeight,
+        {
+          mode: textTreatment.scrimMode === 'solid' ? 'minimal' : textTreatment.scrimMode,
+          radius: Math.max(6, textTreatment.scrimRadius - 4),
+          opacityScale: textTreatment.scrimOpacityScale * 0.92,
+        }
       );
       const subheadPx = toPixels(placementPlan.subhead, canvasWidth, canvasHeight);
       const subheadSize = clamp(
@@ -404,29 +678,56 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
       const minSubheadTop = headlineBottom + laneGap;
       const subheadTop = Math.max(subheadPx.top, minSubheadTop);
       const maxSubheadHeight = Math.max(40, Math.min(subheadPx.height, ctaPx.top - subheadTop - laneGap));
+      const subheadWidth = estimateTextboxWidth(
+        adSpec.texts.subhead,
+        subheadSize,
+        subheadPx.width,
+        'subhead'
+      );
+      const subheadLeft = positionByAlignment(
+        subheadPx.left,
+        subheadPx.width,
+        subheadWidth,
+        placementPlan.subhead.align
+      );
       const subheadTextbox = new Textbox(adSpec.texts.subhead, {
-        left: subheadPx.left,
+        left: subheadLeft,
         top: subheadTop,
-        width: subheadPx.width,
+        width: subheadWidth,
         fontSize: subheadSize,
-        fontFamily: subheadBaseStyle.fontFamily,
-        fontWeight: 'normal',
+        fontFamily: textTreatment.subheadFont,
+        fontWeight: textTreatment.subheadFont === 'Manrope' ? '500' : '400',
+        fontStyle: textTreatment.subheadItalic ? 'italic' : 'normal',
         fill: resolveBlockTextColor(
           placementPlan.subhead,
           placementPlan.subhead.color || subheadBaseStyle.fill
         ),
         textAlign: placementPlan.subhead.align,
-        lineHeight: 1.2,
+        lineHeight: textTreatment.subheadItalic ? 1.28 : 1.18,
       });
       fitTextboxToHeight(subheadTextbox, maxSubheadHeight, 14, 1);
       trimTextToHeight(subheadTextbox, adSpec.texts.subhead, maxSubheadHeight);
       canvas.add(subheadTextbox);
       if (subheadScrim) {
-        linkBackdropToTextbox(canvas, subheadTextbox, subheadScrim.scrim, subheadScrim.padX, subheadScrim.padY);
+        linkBackdropToTextbox(
+          canvas,
+          subheadTextbox,
+          subheadScrim.scrim,
+          subheadScrim.padX,
+          subheadScrim.padY,
+          0,
+          {
+            fitToText: true,
+            minWidth: subheadPx.width * 0.4,
+            maxWidth: subheadPx.width + subheadScrim.padX * 2,
+          }
+        );
       }
       const subheadLayerId = addLayer({ type: 'text', name: 'Subhead', fabricObject: subheadTextbox });
       useLayerStore.getState().updateTextStyle(subheadLayerId, {
         ...subheadBaseStyle,
+        fontFamily: textTreatment.subheadFont,
+        fontStyle: textTreatment.subheadItalic ? 'italic' : 'normal',
         fontSize: subheadTextbox.fontSize || subheadSize,
         fill: resolveBlockTextColor(
           placementPlan.subhead,
@@ -436,52 +737,97 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
         fontWeight: 'normal',
       });
 
-      addScrimIfNeeded(canvas, addLayer, 'CTA', placementPlan.cta, canvasWidth, canvasHeight);
+      addScrimIfNeeded(canvas, addLayer, 'CTA', placementPlan.cta, canvasWidth, canvasHeight, {
+        mode: textTreatment.scrimMode === 'none' ? 'none' : 'minimal',
+        radius: Math.max(6, textTreatment.scrimRadius - 6),
+        opacityScale: textTreatment.scrimOpacityScale * 0.86,
+      });
       const ctaTextSize = clamp(Math.round(headlineSize * 0.34), 14, 30);
       const subheadBottom = (subheadTextbox.top || subheadTop) + (subheadTextbox.height || maxSubheadHeight);
       const minCtaTop = subheadBottom + laneGap;
       const ctaTop = Math.max(ctaPx.top, minCtaTop);
-      const ctaStrip = new Rect({
-        left: ctaPx.left - canvasWidth * 0.012,
-        top: ctaTop - canvasHeight * 0.007,
-        width: ctaPx.width + canvasWidth * 0.024,
-        height: ctaPx.height + canvasHeight * 0.014,
-        fill: hexToRgba(adSpec.colors.background || '#132B20', 0.74),
-        rx: 20,
-        ry: 20,
-        selectable: false,
-        evented: false,
-      });
-      canvas.add(ctaStrip);
-      addLayer({ type: 'shape', name: 'CTA Strip', fabricObject: ctaStrip });
+      const ctaLabelBase = textTreatment.ctaPrefix
+        ? `${textTreatment.ctaPrefix} ${adSpec.texts.cta}`
+        : adSpec.texts.cta;
+      const ctaLabel = textTreatment.ctaUppercase
+        ? ctaLabelBase.toUpperCase()
+        : ctaLabelBase;
+      const ctaWidth = estimateTextboxWidth(ctaLabel, ctaTextSize, ctaPx.width, 'cta');
+      const ctaLeft = positionByAlignment(
+        ctaPx.left,
+        ctaPx.width,
+        ctaWidth,
+        placementPlan.cta.align || 'center'
+      );
+      const ctaPadX = canvasWidth * (textTreatment.ctaMode === 'label' ? 0.008 : 0.012);
+      const ctaPadY = canvasHeight * (textTreatment.ctaMode === 'label' ? 0.004 : 0.007);
 
-      const ctaText = new Textbox(adSpec.texts.cta, {
-        left: ctaPx.left,
+      let ctaStrip: Rect | null = null;
+      if (textTreatment.ctaMode !== 'ghost') {
+        const ctaRectConfig: ConstructorParameters<typeof Rect>[0] = {
+          left: ctaLeft - ctaPadX,
+          top: ctaTop - ctaPadY,
+          width: ctaWidth + ctaPadX * 2,
+          height: ctaPx.height + ctaPadY * 2,
+          rx: textTreatment.ctaRadius,
+          ry: textTreatment.ctaRadius,
+          selectable: false,
+          evented: false,
+          strokeWidth: 0,
+        };
+
+        if (textTreatment.ctaMode === 'outline') {
+          ctaRectConfig.fill = hexToRgba(adSpec.colors.background || '#132B20', textTreatment.ctaFillAlpha);
+          ctaRectConfig.stroke = hexToRgba(adSpec.colors.secondary || '#F1E9DA', textTreatment.ctaStrokeAlpha);
+          ctaRectConfig.strokeWidth = 2;
+        } else if (textTreatment.ctaMode === 'label') {
+          ctaRectConfig.fill = hexToRgba(adSpec.colors.background || '#132B20', textTreatment.ctaFillAlpha);
+          ctaRectConfig.rx = Math.max(6, textTreatment.ctaRadius - 4);
+          ctaRectConfig.ry = Math.max(6, textTreatment.ctaRadius - 4);
+        } else {
+          ctaRectConfig.fill = hexToRgba(adSpec.colors.background || '#132B20', textTreatment.ctaFillAlpha);
+        }
+
+        ctaStrip = new Rect(ctaRectConfig);
+        canvas.add(ctaStrip);
+        addLayer({ type: 'shape', name: 'CTA Strip', fabricObject: ctaStrip });
+      }
+
+      const ctaText = new Textbox(ctaLabel, {
+        left: ctaLeft,
         top: ctaTop,
-        width: ctaPx.width,
+        width: ctaWidth,
         fontSize: ctaTextSize,
-        fontFamily: headlineBaseStyle.fontFamily,
-        fontWeight: '700',
+        fontFamily: textTreatment.ctaFont,
+        fontWeight: textTreatment.ctaMode === 'ghost' ? '600' : '700',
         fill: resolveBlockTextColor(
           placementPlan.cta,
           placementPlan.cta.textColor || placementPlan.cta.color || headlineBaseStyle.fill
         ),
         textAlign: placementPlan.cta.align || 'center',
-        lineHeight: 1.08,
+        lineHeight: 1.06,
       });
 
       canvas.add(ctaText);
-      linkBackdropToTextbox(
-        canvas,
-        ctaText,
-        ctaStrip,
-        canvasWidth * 0.012,
-        canvasHeight * 0.007,
-        ctaPx.height + canvasHeight * 0.014
-      );
+      if (ctaStrip) {
+        linkBackdropToTextbox(
+          canvas,
+          ctaText,
+          ctaStrip,
+          ctaPadX,
+          ctaPadY,
+          ctaPx.height + ctaPadY * 2,
+          {
+            fitToText: true,
+            minWidth: ctaWidth + ctaPadX * 2,
+            maxWidth: ctaPx.width + ctaPadX * 2,
+          }
+        );
+      }
       const ctaLayerId = addLayer({ type: 'text', name: 'CTA', fabricObject: ctaText });
       useLayerStore.getState().updateTextStyle(ctaLayerId, {
         ...headlineBaseStyle,
+        fontFamily: textTreatment.ctaFont,
         fontSize: ctaTextSize,
         fill: resolveBlockTextColor(
           placementPlan.cta,
@@ -497,12 +843,15 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
 
     const headlineSlot = slots.find((s) => s.type === 'headline');
     if (headlineSlot) {
-      const textbox = new Textbox(adSpec.texts.headline, {
+      const headlineText = textTreatment.uppercaseHeadline
+        ? adSpec.texts.headline.toUpperCase()
+        : adSpec.texts.headline;
+      const textbox = new Textbox(headlineText, {
         left: headlineSlot.position.x,
         top: headlineSlot.position.y,
         width: headlineSlot.position.width,
         fontSize: headlineSlot.style.fontSize || 72,
-        fontFamily: headlineSlot.style.fontFamily || 'Space Grotesk',
+        fontFamily: textTreatment.headlineFont,
         fontWeight: headlineSlot.style.fontWeight || '900',
         fill: headlineSlot.style.color || textColor,
         textAlign: headlineSlot.style.textAlign || 'center',
@@ -510,7 +859,10 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
       canvas.add(textbox);
       const textStyle = buildTextStyle(headlineSlot, textColor);
       const layerId = addLayer({ type: 'text', name: 'Headline', fabricObject: textbox });
-      useLayerStore.getState().updateTextStyle(layerId, textStyle);
+      useLayerStore.getState().updateTextStyle(layerId, {
+        ...textStyle,
+        fontFamily: textTreatment.headlineFont,
+      });
     }
 
     const subheadSlot = slots.find((s) => s.type === 'subhead');
@@ -520,25 +872,34 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
         top: subheadSlot.position.y,
         width: subheadSlot.position.width,
         fontSize: subheadSlot.style.fontSize || 28,
-        fontFamily: subheadSlot.style.fontFamily || 'Space Grotesk',
+        fontFamily: textTreatment.subheadFont,
         fontWeight: subheadSlot.style.fontWeight || '400',
+        fontStyle: textTreatment.subheadItalic ? 'italic' : 'normal',
         fill: subheadSlot.style.color || textColor,
         textAlign: subheadSlot.style.textAlign || 'center',
       });
       canvas.add(textbox);
       const textStyle = buildTextStyle(subheadSlot, textColor);
       const layerId = addLayer({ type: 'text', name: 'Subhead', fabricObject: textbox });
-      useLayerStore.getState().updateTextStyle(layerId, textStyle);
+      useLayerStore.getState().updateTextStyle(layerId, {
+        ...textStyle,
+        fontFamily: textTreatment.subheadFont,
+        fontStyle: textTreatment.subheadItalic ? 'italic' : 'normal',
+      });
     }
 
     const ctaSlot = slots.find((s) => s.type === 'cta');
     if (ctaSlot) {
-      const ctaText = new Textbox(adSpec.texts.cta, {
+      const ctaLabelBase = textTreatment.ctaPrefix
+        ? `${textTreatment.ctaPrefix} ${adSpec.texts.cta}`
+        : adSpec.texts.cta;
+      const ctaLabel = textTreatment.ctaUppercase ? ctaLabelBase.toUpperCase() : ctaLabelBase;
+      const ctaText = new Textbox(ctaLabel, {
         left: ctaSlot.position.x,
         top: ctaSlot.position.y,
         width: ctaSlot.position.width,
         fontSize: ctaSlot.style.fontSize || 24,
-        fontFamily: ctaSlot.style.fontFamily || 'Space Grotesk',
+        fontFamily: textTreatment.ctaFont,
         fontWeight: ctaSlot.style.fontWeight || '700',
         fill: ctaSlot.style.color || adSpec.colors.text || '#FFFFFF',
         textAlign: ctaSlot.style.textAlign || 'center',
@@ -547,7 +908,7 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
       canvas.add(ctaText);
       const ctaLayerId = addLayer({ type: 'text', name: 'CTA', fabricObject: ctaText });
       useLayerStore.getState().updateTextStyle(ctaLayerId, {
-        fontFamily: ctaSlot.style.fontFamily || 'Space Grotesk',
+        fontFamily: textTreatment.ctaFont,
         fontSize: ctaSlot.style.fontSize || 24,
         fill: ctaSlot.style.color || adSpec.colors.text || '#FFFFFF',
         fontWeight:
