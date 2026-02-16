@@ -1,14 +1,19 @@
 import { Router, Request, Response } from 'express';
 import {
-  generateEnhancedPrompt,
-  detectCategory,
+  buildPromptPipeline,
   type FormatConfig,
+  type Objective,
+  type PromptPipeline,
+  type PlacementPlanHints,
+  type AgenticPlan,
 } from './promptEngine.js';
 import { generateCopy, validateCopy } from './copyEngine.js';
 import {
   generateLayout,
   type LayoutOutput,
 } from './layoutEngine.js';
+
+const DEFAULT_IMAGE_MODEL = process.env.NANO_BANANA_MODEL || 'gemini-3-pro-image-preview';
 
 const VIBE_COLOR_MAP: Record<string, { primary: string; secondary: string; accent: string }> = {
   energetic: { primary: '#FF6B00', secondary: '#FF9500', accent: '#FFD600' },
@@ -51,6 +56,14 @@ export interface AdSpec {
   category: string;
   layout?: LayoutOutput;
   metadata?: {
+    objective: Objective;
+    promptPipeline: PromptPipeline;
+    placementHints: PlacementPlanHints;
+    agenticPlan: AgenticPlan;
+    model: {
+      provider: 'google';
+      name: string;
+    };
     headlineFormula: string;
     contrastRatios: {
       headline: number;
@@ -107,12 +120,16 @@ export function parsePrompt(prompt: string): ParsedPrompt {
     if (lower.includes(name)) colors.push(hex);
   }
 
-  // Extract product
-  let product = prompt;
+  // Extract product (focus on first clause, then strip intent/style noise)
+  let product = prompt.split(/[,.]/)[0] || prompt;
   if (offer) product = product.replace(new RegExp(offer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '');
+  product = product.replace(/\b(for|targeting)\s+[a-z0-9][a-z0-9\s-]{2,45}$/i, '');
   for (const v of vibeKeywords) product = product.replace(new RegExp(`\\b${v}\\b`, 'gi'), '');
   for (const c of Object.keys(COLOR_NAME_MAP)) product = product.replace(new RegExp(`\\b${c}\\b`, 'gi'), '');
-  product = product.replace(/\b(and|the|a|an|for|with|vibe|sale|discount)\b/gi, '');
+  product = product.replace(
+    /\b(and|the|a|an|for|with|vibe|sale|discount|offer|new|launch|introducing|style|look|now|today)\b/gi,
+    ''
+  );
   product = product.replace(/[,]+/g, ' ').replace(/\s+/g, ' ').trim();
 
   return { product: product || 'product', offer, vibe, colors, rawPrompt: prompt };
@@ -120,19 +137,28 @@ export function parsePrompt(prompt: string): ParsedPrompt {
 
 export function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId?: string): AdSpec {
   const { product, offer, vibe, colors, rawPrompt } = parsed;
+  const resolvedFormat = format ?? 'square';
+  const isPartingWordPrompt = /partingword|partingword\.com|parting word|end[\s-]?of[\s-]?life messaging/i.test(rawPrompt);
 
-  // 1. Detect product category
-  const category = detectCategory(product, rawPrompt);
+  // 1. Build strategy and prompt pipeline
+  const strategy = buildPromptPipeline({
+    rawPrompt,
+    product,
+    description: rawPrompt,
+    vibe,
+    format: resolvedFormat,
+    colors,
+    offer: offer || undefined,
+  });
 
-  // 2. Generate enhanced image prompt
-  const enhancedPrompt = generateEnhancedPrompt(product, rawPrompt, vibe, format ?? 'square', colors);
-
-  // 3. Generate copy
+  // 2. Generate copy tied to objective and category
   const copy = generateCopy({
     product,
     offer: offer || undefined,
     vibe,
-    category,
+    category: strategy.category,
+    objective: strategy.objective,
+    rawPrompt,
   });
 
   const copyValidation = validateCopy(copy);
@@ -140,19 +166,27 @@ export function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId
     console.warn('Copy validation warnings:', copyValidation.errors);
   }
 
-  // 4. Resolve colors
+  // 3. Resolve colors
   const vibeColors = VIBE_COLOR_MAP[vibe] ?? VIBE_COLOR_MAP.energetic;
   const adColors: AdColors = {
     primary: colors[0] ?? vibeColors.primary,
     secondary: colors[1] ?? vibeColors.secondary,
     accent: vibeColors.accent,
-    text: '#FFFFFF',
-    background: '#121212',
+    text: '#F7F7F2',
+    background: vibe === 'minimal' || vibe === 'calm' ? '#12151C' : '#151922',
   };
 
-  // 5. Generate layout
+  if (isPartingWordPrompt) {
+    adColors.primary = '#1E4D3A';
+    adColors.secondary = '#F1E9DA';
+    adColors.accent = '#2D6A4F';
+    adColors.text = '#F6F1E7';
+    adColors.background = '#132B20';
+  }
+
+  // 4. Generate fallback layout (client can override with image-aware placement plan)
   const layout = generateLayout(
-    format ?? 'square',
+    resolvedFormat,
     copy.headline,
     copy.subhead,
     copy.cta,
@@ -162,22 +196,30 @@ export function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId
 
   adColors.text = layout.textColors.headline;
 
-  // 6. Build AdSpec
+  // 5. Build AdSpec
   return {
-    imagePrompt: enhancedPrompt.prompt,
+    imagePrompt: strategy.promptPipeline.baseCreativeBrief,
     texts: {
       headline: copy.headline,
       subhead: copy.subhead,
       cta: copy.cta,
     },
     colors: adColors,
-    templateId: templateId ?? 'default',
-    category,
+    templateId: templateId ?? strategy.suggestedTemplateId,
+    category: strategy.category,
     layout,
     metadata: {
+      objective: strategy.objective,
+      promptPipeline: strategy.promptPipeline,
+      placementHints: strategy.placementHints,
+      agenticPlan: strategy.agenticPlan,
+      model: {
+        provider: 'google',
+        name: DEFAULT_IMAGE_MODEL,
+      },
       headlineFormula: copy.formula,
       contrastRatios: layout.contrastRatios,
-      formatConfig: enhancedPrompt.formatConfig,
+      formatConfig: strategy.formatConfig as FormatConfig,
     },
   };
 }

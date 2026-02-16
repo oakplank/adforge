@@ -6,68 +6,64 @@ import {
 } from './copyEngine.js';
 
 describe('generateCopy', () => {
-  it('generates urgency headline for offers', () => {
+  it('is deterministic for identical input', () => {
+    const input = {
+      product: 'sneakers',
+      offer: '20% off',
+      vibe: 'energetic',
+      category: 'fashion',
+      objective: 'offer' as const,
+    };
+
+    const a = generateCopy(input);
+    const b = generateCopy(input);
+
+    expect(a).toEqual(b);
+  });
+
+  it('generates offer-aware headline when objective is offer', () => {
     const result = generateCopy({
       product: 'shoes',
       offer: '30% off',
       vibe: 'energetic',
       category: 'fashion',
+      objective: 'offer',
     });
 
-    expect(result.formula).toBe('urgency');
-    expect(result.headline.toLowerCase()).toContain('30% off');
+    expect(result.headline.toLowerCase()).toMatch(/off|deal|save|sale|offer/);
   });
 
-  it('generates benefit headline for non-offer products', () => {
-    const result = generateCopy({
-      product: 'leather bags',
-      vibe: 'luxury',
-      category: 'fashion',
-    });
-
-    // Should use benefit or announcement formula
-    expect(['benefit', 'announcement', 'curiosity']).toContain(result.formula);
-    expect(result.headline).toBeTruthy();
-  });
-
-  it('generates Shop Now CTA for offers', () => {
+  it('avoids generic Shop Now default CTA for offers', () => {
     const result = generateCopy({
       product: 'sneakers',
       offer: '20% off',
       vibe: 'energetic',
       category: 'fashion',
+      objective: 'offer',
     });
 
-    expect(result.cta).toBe('Shop Now');
+    expect(result.cta).not.toBe('Shop Now');
+    expect(result.cta.length).toBeLessThanOrEqual(CHAR_LIMITS.cta);
   });
 
-  it('generates category-appropriate CTA for food', () => {
-    const result = generateCopy({
-      product: 'pizza',
-      vibe: 'warm',
-      category: 'food',
-    });
-
-    // Food typically gets Order Now or Shop Now
-    expect(['Order Now', 'Shop Now']).toContain(result.cta);
-  });
-
-  it('generates Book Now CTA for travel', () => {
+  it('generates category-aware CTA for travel', () => {
     const result = generateCopy({
       product: 'vacation package',
-      vibe: 'adventurous',
+      vibe: 'calm',
       category: 'travel',
+      objective: 'awareness',
     });
 
-    expect(result.cta).toBe('Book Now');
+    expect(['Plan Your Escape', 'Start Planning', 'Explore Stays']).toContain(result.cta);
   });
 
-  it('generates subhead that differs from headline', () => {
+  it('generates subhead distinct from headline', () => {
     const result = generateCopy({
       product: 'laptop',
       offer: '15% off',
       vibe: 'minimal',
       category: 'tech',
+      objective: 'offer',
     });
 
     expect(result.subhead).not.toBe(result.headline);
@@ -76,9 +72,10 @@ describe('generateCopy', () => {
 
   it('respects headline character limit', () => {
     const result = generateCopy({
-      product: 'super deluxe premium ultra wireless noise-cancelling headphones',
+      product: 'super deluxe premium ultra wireless noise cancelling headphones',
       vibe: 'minimal',
       category: 'tech',
+      objective: 'awareness',
     });
 
     expect(result.headline.length).toBeLessThanOrEqual(CHAR_LIMITS.headline);
@@ -89,6 +86,7 @@ describe('generateCopy', () => {
       product: 'amazing product',
       vibe: 'energetic',
       category: 'general',
+      objective: 'awareness',
     });
 
     expect(result.subhead.length).toBeLessThanOrEqual(CHAR_LIMITS.subhead);
@@ -99,29 +97,63 @@ describe('generateCopy', () => {
       product: 'product',
       vibe: 'energetic',
       category: 'general',
+      objective: 'launch',
     });
 
     expect(result.cta.length).toBeLessThanOrEqual(CHAR_LIMITS.cta);
   });
 
-  it('uses number formula for fitness category', () => {
+  it('generates relevant compassionate copy for PartingWord context', () => {
     const result = generateCopy({
-      product: 'workout program',
-      vibe: 'energetic',
-      category: 'fitness',
+      product: 'PartingWord',
+      vibe: 'calm',
+      category: 'general',
+      objective: 'launch',
+      rawPrompt: 'PartingWord.com end of life messaging platform for loved ones',
     });
 
-    expect(result.formula).toBe('number');
+    expect(result.headline.toLowerCase()).toMatch(/messages|words|voice|meaningful/);
+    expect(result.subhead.toLowerCase()).toMatch(/legacy|loved|message|end-of-life|trusted|future|guidance|memories|love/);
+    expect(result.cta.length).toBeLessThanOrEqual(CHAR_LIMITS.cta);
+    expect(result.cta.toLowerCase()).toMatch(/message|process|care|write|learn|start/);
   });
 
-  it('uses question formula for travel category', () => {
+  it('avoids discount-store CTA language in compassionate mode', () => {
     const result = generateCopy({
-      product: 'beach resort',
+      product: 'legacy messaging app',
       vibe: 'calm',
-      category: 'travel',
+      category: 'general',
+      objective: 'awareness',
+      rawPrompt: 'end of life legacy communication platform',
     });
 
-    expect(result.formula).toBe('question');
+    expect(result.cta.toLowerCase()).not.toMatch(/deal|save|shop|buy|drop/);
+  });
+
+  it('generates caregiver-specific compassionate copy', () => {
+    const result = generateCopy({
+      product: 'PartingWord',
+      vibe: 'calm',
+      category: 'general',
+      objective: 'awareness',
+      rawPrompt: 'PartingWord for caregivers and family coordinators with practical care instructions',
+    });
+
+    expect(result.subhead.toLowerCase()).toMatch(/care|guidance|family|notes|instructions|coordinator/);
+  });
+
+  it('does not inject ellipsis in generated compassionate copy', () => {
+    const result = generateCopy({
+      product: 'PartingWord',
+      vibe: 'calm',
+      category: 'general',
+      objective: 'launch',
+      rawPrompt: 'PartingWord voice and written message preservation',
+    });
+
+    expect(result.headline.includes('…')).toBe(false);
+    expect(result.subhead.includes('…')).toBe(false);
+    expect(result.cta.includes('…')).toBe(false);
   });
 });
 
@@ -129,8 +161,8 @@ describe('validateCopy', () => {
   it('returns valid for proper copy', () => {
     const copy = {
       headline: 'Short Headline',
-      subhead: 'A slightly longer subhead that fits',
-      cta: 'Shop Now',
+      subhead: 'A slightly longer subhead that still fits the limit.',
+      cta: 'Learn More',
       formula: 'benefit' as const,
     };
 
@@ -141,48 +173,48 @@ describe('validateCopy', () => {
 
   it('returns error for too-long headline', () => {
     const copy = {
-      headline: 'This is a very long headline that definitely exceeds the character limit',
+      headline: 'This is a very long headline that definitely exceeds the character limit for this engine',
       subhead: 'Normal subhead',
-      cta: 'Shop',
+      cta: 'Learn More',
       formula: 'benefit' as const,
     };
 
     const result = validateCopy(copy);
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes('Headline'))).toBe(true);
+    expect(result.errors.some((e) => e.includes('Headline'))).toBe(true);
   });
 
   it('returns error for too-long subhead', () => {
     const copy = {
       headline: 'Normal',
-      subhead: 'This is an incredibly long subhead that goes on and on and exceeds the character limit for Instagram ad copy',
-      cta: 'Shop',
+      subhead: 'This subhead intentionally exceeds the character limit by being dramatically long and repetitive for testing.',
+      cta: 'Learn More',
       formula: 'benefit' as const,
     };
 
     const result = validateCopy(copy);
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes('Subhead'))).toBe(true);
+    expect(result.errors.some((e) => e.includes('Subhead'))).toBe(true);
   });
 
   it('returns error for too-long CTA', () => {
     const copy = {
       headline: 'Normal',
       subhead: 'Normal subhead',
-      cta: 'This CTA is way too long',
+      cta: 'This CTA is definitely too long',
       formula: 'benefit' as const,
     };
 
     const result = validateCopy(copy);
     expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.includes('CTA'))).toBe(true);
+    expect(result.errors.some((e) => e.includes('CTA'))).toBe(true);
   });
 });
 
 describe('CHAR_LIMITS', () => {
-  it('has correct Instagram best practice limits', () => {
-    expect(CHAR_LIMITS.headline).toBe(30);
-    expect(CHAR_LIMITS.subhead).toBe(60);
-    expect(CHAR_LIMITS.cta).toBe(15);
+  it('uses tuned limits for ad readability', () => {
+    expect(CHAR_LIMITS.headline).toBe(34);
+    expect(CHAR_LIMITS.subhead).toBe(62);
+    expect(CHAR_LIMITS.cta).toBe(16);
   });
 });

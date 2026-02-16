@@ -181,6 +181,7 @@ export function useGeneration(): UseGenerationReturn {
         prompt: adSpec.imagePrompt,
         width,
         height,
+        qualityGate: true,
       };
 
       if (promptPipeline?.renderPrompt) {

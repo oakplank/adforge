@@ -592,6 +592,8 @@ function buildCreativeThoughtSession(input: {
       'human presence policy is violated or feels staged',
       'text lane has noisy gradients/bokeh that harm readability',
       'props conflict with narrative moment or audience context',
+      'any legible text, quote overlay, logo, watermark, or UI glyph appears in-scene',
+      'a hard vertical split panel, border, matte band, or letterbox appears',
     ],
   };
 }
@@ -1000,6 +1002,8 @@ function buildRenderPrompt(input: {
         ? 'left'
         : 'right';
   const contrastLaneInstruction = `The ${laneSide} 45% of the frame must maintain consistent low-detail tonality for high-contrast text overlay. Avoid gradient shifts, bokeh orbs, and texture changes in this zone.`;
+  const laneNaturalnessInstruction =
+    'Text-supporting negative space must come from a natural scene surface (wall, curtain, sky, soft depth), never a synthetic split-screen panel, hard vertical wipe, or artificial side bar.';
   const sceneCoherenceInstruction =
     brand?.id === 'partingword'
       ? 'Use one coherent narrative scene with one primary anchor object and supporting props from the same world. Do not mix app UI symbols with unrelated physical props. Human presence should be subtle and natural (hands or partial person), not staged.'
@@ -1008,6 +1012,8 @@ function buildRenderPrompt(input: {
     brand?.id === 'partingword'
       ? 'Do not render tablets, phones, laptops, floating app icons, email glyphs, or glowing UI overlays.'
       : '';
+  const noLegibleTextInstruction =
+    'No visible words, letters, numerals, logos, signage, subtitles, captions, quote overlays, or watermark-like marks anywhere in the image. If paper, books, labels, or screens appear, any marks must be abstract/illegible only.';
 
   return normalizeWhitespace([
     `Create a premium Instagram ad base image.`,
@@ -1059,10 +1065,12 @@ function buildRenderPrompt(input: {
     partingWordNoUiInstruction,
     `Avoid perfectly centered hero placement unless explicitly requested; bias subject to one third to preserve clean text lanes.`,
     contrastLaneInstruction,
+    laneNaturalnessInstruction,
     textSafeZoneInstructions,
     `Category insight: ${categoryArchetype.categoryInsight}.`,
     `Authenticity: visible natural material texture, non-posed realism, and believable lighting falloff.`,
     `Avoid visual clutter, stock-photo energy, cheap marketplace look, symmetrical-by-default framing, and unreadable backgrounds.`,
+    noLegibleTextInstruction,
     `No text overlays, no logos, no watermarks, no UI elements.`,
     `Photorealistic, campaign-quality, professional location-or-studio photography.`,
   ].join(' '));
@@ -1082,6 +1090,8 @@ function buildSystemPrompt(profile: StyleProfile, objective: Objective, brand?: 
     `Then choose a scene that communicates product outcome and emotional truth for that audience. Avoid repetitive static compositions.`,
     `Keep narrative logic consistent: one scene, one clear subject, no random symbolic collisions.`,
     `Reject bland defaults (single object on plain white background, centered tabletop symmetry) unless user explicitly asks for that style.`,
+    `Never output synthetic split-screen side panels, matte borders, letterboxing, or hard-edge vertical wipes intended to fake text lanes.`,
+    `Never output legible text in-scene (including quotes, labels, signage, handwriting, UI text, or watermark-like artifacts).`,
     `Hard constraints: no text, no logos, no watermark, no cheap ecommerce aesthetic, no generic stock-photo energy.`,
     `Keep negative space intentional so downstream layout can place headline, subhead, and CTA.`,
     `When uncertain, prefer authentic imperfection over decorative polish.`,
