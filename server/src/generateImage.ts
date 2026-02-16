@@ -357,6 +357,7 @@ export class NanoBananaClient {
         `Quality correction pass ${attempt + 1}: ${report.correctionPrompt}`,
         'Mandatory: natural full-bleed composition, no split-screen panels, no matte borders.',
         'Mandatory: no visible text, logos, quote overlays, watermark artifacts, or UI glyphs.',
+        'Mandatory: if paper, books, labels, or cards are present, keep all markings blank, abstract, or fully illegible.',
       ].join(' '));
     }
 
