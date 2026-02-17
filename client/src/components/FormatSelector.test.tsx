@@ -23,7 +23,7 @@ describe('FormatSelector', () => {
     renderSelector();
     const select = screen.getByTestId('format-selector') as HTMLSelectElement;
     const options = select.querySelectorAll('option');
-    expect(options).toHaveLength(3);
+    expect(options).toHaveLength(4);
     expect(options[0].textContent).toContain('Square');
     expect(options[1].textContent).toContain('Portrait');
     expect(options[2].textContent).toContain('Story');

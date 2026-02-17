@@ -16,11 +16,12 @@ describe('getSafeZonePixels', () => {
     expect(zones.actionSafe.left).toBe(54);
   });
 
-  it('uses different margins for story format', () => {
+  it('uses asymmetric margins for story format', () => {
     const zones = getSafeZonePixels('story', 1080, 1920);
-    // Story has 15% title safe
-    expect(zones.titleSafe.top).toBe(1920 * 0.15);
-    expect(zones.titleSafe.left).toBe(1080 * 0.15);
+    // Story has 14% top, 35% bottom, 14% title safe for left/right
+    expect(zones.titleSafe.top).toBe(1920 * 0.14);
+    expect(zones.titleSafe.bottom).toBe(1920 * 0.35);
+    expect(zones.titleSafe.left).toBe(1080 * 0.14);
   });
 
   it('adjusts safe zones for portrait format', () => {
