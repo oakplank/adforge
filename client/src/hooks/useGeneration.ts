@@ -1,5 +1,11 @@
 import { useState } from 'react';
 import {
+  generateAd as apiGenerateAd,
+  generateImage as apiGenerateImage,
+  saveGeneration,
+  type GenerateImageRequest,
+} from '../api/client';
+import {
   analyzeImageForPlacement,
   type PlacementHints,
   type PlacementPlan,
@@ -120,38 +126,6 @@ function toPlacementHints(adSpec: AdSpec, format: string): PlacementHints {
   };
 }
 
-async function persistGenerationHistory(
-  prompt: string,
-  format: string,
-  width: number,
-  height: number,
-  adSpec: AdSpec,
-  imgData: Record<string, unknown>
-): Promise<void> {
-  try {
-    await fetch('/api/generations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt,
-        format,
-        width,
-        height,
-        imagePrompt: adSpec.imagePrompt,
-        enhancedPrompt: adSpec.metadata?.promptPipeline?.renderPrompt,
-        systemPrompt: adSpec.metadata?.promptPipeline?.systemPrompt,
-        model: adSpec.metadata?.model?.name,
-        adSpec,
-        imageBase64: typeof imgData.imageBase64 === 'string' ? imgData.imageBase64 : undefined,
-        imageUrl: typeof imgData.imageUrl === 'string' ? imgData.imageUrl : undefined,
-        mimeType: typeof imgData.mimeType === 'string' ? imgData.mimeType : undefined,
-      }),
-    });
-  } catch {
-    // Non-blocking: generation is still valid if history persistence fails.
-  }
-}
-
 export function useGeneration(): UseGenerationReturn {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,24 +136,15 @@ export function useGeneration(): UseGenerationReturn {
     setIsGenerating(true);
 
     try {
-      const adRes = await fetch('/api/generate-ad', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, format, templateId }),
-      });
-
-      if (!adRes.ok) {
-        const data = await adRes.json().catch(() => ({ error: 'Failed to generate ad' }));
-        throw new Error(data.error || 'Failed to generate ad');
-      }
-
-      const adSpec: AdSpec = await adRes.json();
+      // Step 1: Generate ad spec via API client
+      const adSpec = await apiGenerateAd(prompt, format, templateId) as unknown as AdSpec;
       const fallbackDims = FORMAT_DIMENSIONS[format] || FORMAT_DIMENSIONS.square;
       const width = adSpec.metadata?.formatConfig?.width || fallbackDims.width;
       const height = adSpec.metadata?.formatConfig?.height || fallbackDims.height;
 
+      // Step 2: Build image generation request
       const promptPipeline = adSpec.metadata?.promptPipeline;
-      const imageBody: Record<string, unknown> = {
+      const imageBody: GenerateImageRequest = {
         prompt: adSpec.imagePrompt,
         width,
         height,
@@ -196,20 +161,11 @@ export function useGeneration(): UseGenerationReturn {
         imageBody.model = adSpec.metadata.model.name;
       }
 
-      const imgRes = await fetch('/api/generate-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(imageBody),
-      });
-
-      if (!imgRes.ok) {
-        const data = await imgRes.json().catch(() => ({ error: 'Failed to generate image' }));
-        throw new Error(data.error || 'Failed to generate image');
-      }
-
-      const imgData = await imgRes.json();
+      // Step 3: Generate image via API client
+      const imgData = await apiGenerateImage(imageBody);
       const imageSrc = imgData.imageBase64 ? `data:image/png;base64,${imgData.imageBase64}` : imgData.imageUrl;
 
+      // Step 4: Analyze image placement if base64
       if (imageSrc && imageSrc.startsWith('data:')) {
         const placementPlan = await analyzeWithTimeout(imageSrc, toPlacementHints(adSpec, format));
         if (placementPlan) {
@@ -227,7 +183,27 @@ export function useGeneration(): UseGenerationReturn {
       };
 
       setResult(genResult);
-      await persistGenerationHistory(prompt.trim(), format, width, height, adSpec, imgData);
+
+      // Step 5: Persist generation history (non-blocking)
+      try {
+        await saveGeneration({
+          prompt: prompt.trim(),
+          format,
+          width,
+          height,
+          imagePrompt: adSpec.imagePrompt,
+          enhancedPrompt: adSpec.metadata?.promptPipeline?.renderPrompt,
+          systemPrompt: adSpec.metadata?.promptPipeline?.systemPrompt,
+          model: adSpec.metadata?.model?.name,
+          adSpec,
+          imageBase64: imgData.imageBase64,
+          imageUrl: imgData.imageUrl,
+          mimeType: imgData.mimeType,
+        });
+      } catch {
+        // Non-blocking: generation is still valid if history persistence fails.
+      }
+
       return genResult;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Generation failed';
