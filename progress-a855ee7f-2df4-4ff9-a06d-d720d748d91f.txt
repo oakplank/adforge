@@ -31,3 +31,14 @@
 - All 256 tests pass, typecheck passes
 - **Learnings:** contrastRatio helper is reusable for any future color accessibility checks
 ---
+
+## 2026-02-16 20:23 - US-007: Update copyEngine.ts to support intent-based copy strategy
+- Added `import type { AdIntent }` to copyEngine.ts
+- Added optional `intent?: AdIntent` field to `CopyInput` interface
+- Updated `formulaCandidates()`: intent takes priority over objective/category — retargeting→proof/benefit/question, conversion→urgency/number/benefit, awareness→benefit/curiosity/question
+- Updated `ctaCandidates()`: intent takes priority — retargeting uses dedicated RETARGETING_CTA_CANDIDATES
+- Exported `RETARGETING_CTA_CANDIDATES` with 5 options: Come Back, Still Interested?, Complete Order, Finish Checkout, Return & Save
+- Added conversion and awareness intent-specific CTA lists
+- Added 8 new tests: intent acceptance, retargeting CTAs, retargeting CTA count, formula differentiation between intents, awareness formula verification, conversion CTAs, char limits for all intents, backward compatibility without intent
+- All 285 tests pass, typecheck passes
+---
