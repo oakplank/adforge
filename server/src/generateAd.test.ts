@@ -1,7 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import request from 'supertest';
 import app from './app.js';
 import { parsePrompt, generateAdSpec } from './generateAd.js';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('parsePrompt', () => {
   it('extracts offer percentage', () => {
@@ -50,6 +54,16 @@ describe('parsePrompt', () => {
     const input = 'Test prompt with special chars !@#$';
     const result = parsePrompt(input);
     expect(result.rawPrompt).toBe(input);
+  });
+
+  it('detects explicit website signal when prefixed with @', () => {
+    const result = parsePrompt('launch campaign for @clearpathathletics.com');
+    expect(result.websiteUrl).toBe('https://clearpathathletics.com');
+  });
+
+  it('detects bare domain website signal', () => {
+    const result = parsePrompt('launch campaign for clearpathathletics.com spring showcase');
+    expect(result.websiteUrl).toBe('https://clearpathathletics.com');
   });
 });
 
@@ -120,6 +134,14 @@ describe('generateAdSpec', () => {
     expect(spec.colors.accent).toBe('#2D6A4F');
     expect(spec.templateId).toBe('minimal');
   });
+
+  it('returns brand mention metadata when prompt contains website/brand cues', () => {
+    const parsed = parsePrompt('ClearPathAthletics.com spring showcase registration');
+    const spec = generateAdSpec(parsed, 'portrait');
+
+    expect(spec.metadata?.brandMentionMode).toBeTruthy();
+    expect(['none', 'cta', 'subhead', 'headline']).toContain(spec.metadata?.brandMentionMode);
+  });
 });
 
 describe('POST /api/generate-ad', () => {
@@ -175,6 +197,8 @@ describe('POST /api/generate-ad', () => {
     expect(res.body.metadata.placementHints).toBeDefined();
     expect(res.body.metadata.agenticPlan).toBeDefined();
     expect(res.body.metadata.promptPipeline.systemPrompt).toBeTruthy();
+    expect(res.body.metadata.copyPlan).toBeDefined();
+    expect(typeof res.body.metadata.copyPlan.strategy).toBe('string');
   });
 
   it('rotates copy variant index for repeated prompt requests', async () => {
@@ -187,5 +211,38 @@ describe('POST /api/generate-ad', () => {
     expect(typeof first.body.metadata.copyVariantIndex).toBe('number');
     expect(typeof second.body.metadata.copyVariantIndex).toBe('number');
     expect(second.body.metadata.copyVariantIndex).toBe((first.body.metadata.copyVariantIndex + 1) % 997);
+  });
+
+  it('attaches website brand kit metadata when @domain trigger is used', async () => {
+    const mockHtml = `
+      <html>
+        <head>
+          <title>ClearPath Athletics</title>
+          <link rel="icon" href="/logos/logo-dark.png" />
+        </head>
+        <body style="background:#071631;color:#63A8FF">
+          <div style="color:#B3D6F6"></div>
+        </body>
+      </html>
+    `;
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => mockHtml,
+    } as unknown as Response);
+
+    const res = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'create launch ad for @clearpathathletics.com, energetic vibe' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.metadata.brandKit).toBeTruthy();
+    expect(res.body.metadata.brandKit.domain).toBe('clearpathathletics.com');
+    expect(res.body.metadata.brandKit.brandName).toContain('ClearPath');
+    expect(Array.isArray(res.body.metadata.brandKit.palette)).toBe(true);
+    expect(typeof res.body.metadata.brandKit.contextSummary).toBe('string');
+    expect(Array.isArray(res.body.metadata.brandKit.keyPhrases)).toBe(true);
+    expect(res.body.metadata.promptPipeline.baseCreativeBrief).toContain('Goal:');
   });
 });

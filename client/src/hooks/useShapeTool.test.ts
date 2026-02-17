@@ -7,7 +7,8 @@ vi.mock('fabric', () => {
   const MockRect = vi.fn().mockImplementation((opts) => ({ type: 'rect', ...opts, set: vi.fn() }));
   const MockCircle = vi.fn().mockImplementation((opts) => ({ type: 'circle', ...opts, set: vi.fn() }));
   const MockLine = vi.fn().mockImplementation((_coords, opts) => ({ type: 'line', ...opts, set: vi.fn() }));
-  return { Rect: MockRect, Circle: MockCircle, Line: MockLine };
+  const MockGradient = vi.fn().mockImplementation((opts) => ({ type: 'gradient', ...opts }));
+  return { Rect: MockRect, Circle: MockCircle, Line: MockLine, Gradient: MockGradient };
 });
 
 function makeMockCanvas() {
@@ -58,6 +59,19 @@ describe('useShapeTool', () => {
     const layers = useLayerStore.getState().layers;
     expect(layers).toHaveLength(1);
     expect(layers[0].name).toBe('Line');
+  });
+
+  it('adds a gradient band shape layer with gradient style', () => {
+    const canvas = makeMockCanvas();
+    const { result } = renderHook(() => useShapeTool(canvas));
+
+    act(() => { result.current.addShape('gradient-band'); });
+
+    const layers = useLayerStore.getState().layers;
+    expect(layers).toHaveLength(1);
+    expect(layers[0].name).toBe('Gradient Band');
+    expect(layers[0].shapeStyle?.fillMode).toBe('gradient');
+    expect(layers[0].shapeStyle?.gradient.endOpacity).toBeGreaterThan(0.5);
   });
 
   it('does nothing when canvas is null', () => {

@@ -48,4 +48,22 @@ describe('ShapeControls', () => {
     const layer = useLayerStore.getState().layers.find((l) => l.id === layerId);
     expect(layer?.shapeStyle?.cornerRadius).toBe(12);
   });
+
+  it('supports gradient fill controls and updates gradient style', () => {
+    const mockObj = { set: () => {}, canvas: { requestRenderAll: () => {} } };
+    const layerId = useLayerStore.getState().addLayer({ type: 'shape', name: 'Gradient Band', fabricObject: mockObj as any });
+    useLayerStore.getState().selectLayer(layerId);
+
+    render(<ShapeControls />);
+    fireEvent.change(screen.getByTestId('shape-fill-mode'), { target: { value: 'gradient' } });
+    fireEvent.change(screen.getByTestId('shape-gradient-start-color'), { target: { value: '#123456' } });
+    fireEvent.change(screen.getByTestId('shape-gradient-end-opacity'), { target: { value: '80' } });
+    fireEvent.change(screen.getByTestId('shape-gradient-angle'), { target: { value: '42' } });
+
+    const layer = useLayerStore.getState().layers.find((l) => l.id === layerId);
+    expect(layer?.shapeStyle?.fillMode).toBe('gradient');
+    expect(layer?.shapeStyle?.gradient.startColor).toBe('#123456');
+    expect(layer?.shapeStyle?.gradient.endOpacity).toBe(0.8);
+    expect(layer?.shapeStyle?.gradient.angle).toBe(42);
+  });
 });

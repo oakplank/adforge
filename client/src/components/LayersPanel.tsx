@@ -20,16 +20,16 @@ export function LayersPanel() {
         <div
           key={layer.id}
           data-testid={`layer-item-${layer.id}`}
-          className={`flex items-center gap-2 px-3 py-2 cursor-pointer text-sm border-b transition-colors ${
+          className={`layer-row ${
             selectedLayerId === layer.id
-              ? 'bg-orange-500/15 border-l-2 border-l-orange-400 border-white/10'
-              : 'border-white/[0.07] hover:bg-white/[0.04]'
+              ? 'layer-row-active'
+              : 'layer-row-idle'
           }`}
           onClick={() => selectLayer(layer.id)}
         >
-          <span className="w-8 text-[10px] text-center tracking-wide text-zinc-400">{typeLabels[layer.type]}</span>
+          <span className="layer-type-pill">{typeLabels[layer.type]}</span>
 
-          <span className={`flex-1 truncate ${!layer.visible ? 'text-zinc-500 line-through' : 'text-zinc-200'}`}>
+          <span className={`flex-1 truncate ${!layer.visible ? 'text-zinc-500 line-through' : 'text-zinc-100'}`}>
             {layer.name}
           </span>
 
@@ -39,7 +39,7 @@ export function LayersPanel() {
               event.stopPropagation();
               toggleVisibility(layer.id);
             }}
-            className="text-xs text-zinc-400 hover:text-zinc-100 w-5 text-center"
+            className="layer-action-button"
             title={layer.visible ? 'Hide layer' : 'Show layer'}
           >
             {layer.visible ? 'ON' : 'OFF'}
@@ -51,10 +51,10 @@ export function LayersPanel() {
               event.stopPropagation();
               moveLayer(layer.id, 'up');
             }}
-            className="text-xs text-zinc-400 hover:text-zinc-100"
+            className="layer-action-button"
             title="Move up"
           >
-            +
+            ^
           </button>
 
           <button
@@ -63,10 +63,10 @@ export function LayersPanel() {
               event.stopPropagation();
               moveLayer(layer.id, 'down');
             }}
-            className="text-xs text-zinc-400 hover:text-zinc-100"
+            className="layer-action-button"
             title="Move down"
           >
-            -
+            v
           </button>
 
           <button
@@ -75,7 +75,7 @@ export function LayersPanel() {
               event.stopPropagation();
               removeLayer(layer.id);
             }}
-            className="text-xs text-rose-300 hover:text-rose-200"
+            className="layer-action-button text-rose-300 hover:text-rose-200"
             title="Delete layer"
           >
             x
@@ -83,7 +83,7 @@ export function LayersPanel() {
         </div>
       ))}
 
-      {layers.length === 0 && <div className="px-3 py-4 text-xs text-zinc-500 text-center">No layers yet</div>}
+      {layers.length === 0 && <div className="px-3 py-6 text-xs text-zinc-500 text-center">No layers yet</div>}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { CanvasEditor } from './CanvasEditor';
 import { FormatProvider } from '../context/FormatContext';
 
@@ -47,5 +47,11 @@ describe('CanvasEditor', () => {
     render(W(<CanvasEditor />));
     expect(screen.getByTestId('add-text-button')).toBeInTheDocument();
     expect(screen.getByTestId('add-text-button')).toHaveTextContent('Text');
+  });
+
+  it('includes Gradient Band in shape menu', () => {
+    render(W(<CanvasEditor />));
+    fireEvent.click(screen.getByTestId('add-shape-button'));
+    expect(screen.getByTestId('add-shape-gradient-band')).toBeInTheDocument();
   });
 });

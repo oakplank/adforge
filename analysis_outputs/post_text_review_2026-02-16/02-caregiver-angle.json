@@ -1,0 +1,36 @@
+{
+  "id": "02-caregiver-angle",
+  "prompt": "PartingWord for caregivers and family coordinators, focus on guidance notes and practical care instructions with emotional warmth, Instagram portrait ad.",
+  "screenshotFull": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_2026-02-16/02-caregiver-angle-full.png",
+  "screenshotCanvas": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_2026-02-16/02-caregiver-angle-canvas.png",
+  "text": {
+    "headline": "Messages for the People You Love",
+    "subhead": "Write future messages your loved ones can receive at the right time.",
+    "cta": "Explore PartingWo…"
+  },
+  "templateId": "minimal",
+  "objective": "awareness",
+  "thoughtSession": {
+    "targetAudience": "caregivers and family coordinators",
+    "decisionSummary": "Audience-first awareness narrative for caregivers and family coordinators, resolved as \"Keepsake Archive\" with partial_person human presence and high documentary-style photorealism with compassionate editorial polish.",
+    "narrativeMoment": "a real moment of preparing a meaningful future message in a lived-in home environment",
+    "humanPresence": "partial_person",
+    "realismLevel": "high documentary-style photorealism with compassionate editorial polish",
+    "realismCues": [
+      "natural hand posture and non-posed gestures",
+      "subtle material wear (paper grain, leather texture, wood imperfections)",
+      "soft shadow falloff from real window or practical light sources"
+    ],
+    "subjectPriority": "hero subject should feel meaningful and emotionally grounded, occupying 38-52% of the frame",
+    "backgroundPriority": "background should provide lived-in emotional context while keeping a clean low-detail text lane",
+    "lightingApproach": "soft directional natural light with gentle contrast, avoiding harsh dramatic stylization",
+    "compositionApproach": "asymmetric narrative composition with one-third subject bias, no centered tabletop default, and intentional breathing room",
+    "regenerationTriggers": [
+      "scene appears as isolated object on blank/white sterile background",
+      "composition defaults to centered static tabletop symmetry",
+      "human presence policy is violated or feels staged",
+      "text lane has noisy gradients/bokeh that harm readability",
+      "props conflict with narrative moment or audience context"
+    ]
+  }
+}

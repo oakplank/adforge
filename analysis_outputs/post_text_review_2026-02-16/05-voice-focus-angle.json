@@ -1,0 +1,36 @@
+{
+  "id": "05-voice-focus-angle",
+  "prompt": "PartingWord voice and written message preservation campaign, emotionally specific but clear, no generic CTA marketing jargon.",
+  "screenshotFull": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_2026-02-16/05-voice-focus-angle-full.png",
+  "screenshotCanvas": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_2026-02-16/05-voice-focus-angle-canvas.png",
+  "text": {
+    "headline": "When Words Matter Most",
+    "subhead": "Turn meaningful thoughts into lasting messages your family can keep.",
+    "cta": "Start a Message"
+  },
+  "templateId": "minimal",
+  "objective": "awareness",
+  "thoughtSession": {
+    "targetAudience": "adults preparing legacy messages for loved ones, caregivers, and family decision-makers",
+    "decisionSummary": "Audience-first awareness narrative for adults preparing legacy messages for loved ones, caregivers, and family decision-makers, resolved as \"Voice Legacy\" with hands_only human presence and high documentary-style photorealism with compassionate editorial polish.",
+    "narrativeMoment": "a real moment of preparing a meaningful future message in a lived-in home environment",
+    "humanPresence": "hands_only",
+    "realismLevel": "high documentary-style photorealism with compassionate editorial polish",
+    "realismCues": [
+      "natural hand posture and non-posed gestures",
+      "subtle material wear (paper grain, leather texture, wood imperfections)",
+      "soft shadow falloff from real window or practical light sources"
+    ],
+    "subjectPriority": "hero subject should feel meaningful and emotionally grounded, occupying 38-52% of the frame",
+    "backgroundPriority": "background should provide lived-in emotional context while keeping a clean low-detail text lane",
+    "lightingApproach": "soft directional natural light with gentle contrast, avoiding harsh dramatic stylization",
+    "compositionApproach": "asymmetric narrative composition with one-third subject bias, no centered tabletop default, and intentional breathing room",
+    "regenerationTriggers": [
+      "scene appears as isolated object on blank/white sterile background",
+      "composition defaults to centered static tabletop symmetry",
+      "human presence policy is violated or feels staged",
+      "text lane has noisy gradients/bokeh that harm readability",
+      "props conflict with narrative moment or audience context"
+    ]
+  }
+}

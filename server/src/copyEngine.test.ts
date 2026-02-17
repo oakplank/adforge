@@ -154,6 +154,47 @@ describe('generateCopy', () => {
     expect(result.cta.toLowerCase()).not.toMatch(/deal|save|shop|buy|drop/);
   });
 
+  it('can use a short website as CTA in non-subtle offer contexts', () => {
+    const result = generateCopy({
+      product: 'training camp',
+      offer: '20% off',
+      vibe: 'energetic',
+      category: 'fitness',
+      objective: 'offer',
+      rawPrompt: '20% off training camp at ace.co this weekend',
+    });
+
+    expect(result.brandMention?.mode).toBe('cta');
+    expect(result.cta.length).toBeLessThanOrEqual(CHAR_LIMITS.cta);
+    expect(result.cta.toLowerCase()).toMatch(/ace|visit/);
+  });
+
+  it('keeps long-domain mentions subtle without degrading subhead quality', () => {
+    const result = generateCopy({
+      product: 'basketball showcase',
+      vibe: 'professional',
+      category: 'fitness',
+      objective: 'launch',
+      rawPrompt: 'ClearPathAthletics.com basketball showcase registration',
+    });
+
+    expect(['none', 'subhead']).toContain(result.brandMention?.mode);
+    expect(result.subhead.toLowerCase()).not.toBe('at clearpathathletics.com.');
+  });
+
+  it('keeps compassionate brand mentions subtle instead of forcing domain CTA', () => {
+    const result = generateCopy({
+      product: 'PartingWord',
+      vibe: 'calm',
+      category: 'general',
+      objective: 'awareness',
+      rawPrompt: 'PartingWord.com end of life messaging platform for loved ones',
+    });
+
+    expect(result.brandMention?.mode).not.toBe('cta');
+    expect(result.cta.toLowerCase()).not.toMatch(/\.com|visit/);
+  });
+
   it('generates caregiver-specific compassionate copy', () => {
     const result = generateCopy({
       product: 'PartingWord',
@@ -178,6 +219,28 @@ describe('generateCopy', () => {
     expect(result.headline.includes('…')).toBe(false);
     expect(result.subhead.includes('…')).toBe(false);
     expect(result.cta.includes('…')).toBe(false);
+  });
+
+  it('uses planning-layer context to shape compassionate copy and CTA intent', () => {
+    const result = generateCopy({
+      product: 'PartingWord',
+      vibe: 'calm',
+      category: 'general',
+      objective: 'awareness',
+      rawPrompt: 'PartingWord.com end of life messaging platform',
+      planning: {
+        targetAudience: 'caregivers and family coordinators',
+        narrativeMoment: 'preparing guidance for future care decisions',
+        copyStrategy: 'Lead with clarity and reassurance, then low-friction action.',
+        ctaPriority: 'low',
+        keyPhrases: ['care notes', 'family coordinators', 'guidance'],
+      },
+    });
+
+    expect(result.planningDriven).toBe(true);
+    expect(result.planningRationale?.length).toBeGreaterThan(0);
+    expect(result.subhead.toLowerCase()).toMatch(/guidance|care|secure|trusted|family|caregivers/);
+    expect(result.cta.toLowerCase()).not.toMatch(/shop|buy|deal|save/);
   });
 });
 

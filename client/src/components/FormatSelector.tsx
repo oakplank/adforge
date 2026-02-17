@@ -12,7 +12,7 @@ export function FormatSelector() {
         const selected = AD_FORMATS.find((candidate) => candidate.id === event.target.value);
         if (selected) setFormat(selected);
       }}
-      className="rounded-md border px-2 py-1 text-xs md:text-sm font-medium bg-white/[0.03] text-zinc-100 border-white/[0.12]"
+      className="format-selector"
     >
       {AD_FORMATS.map((candidate) => (
         <option key={candidate.id} value={candidate.id}>

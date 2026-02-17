@@ -28,6 +28,17 @@ function handleKeyDown(e: KeyboardEvent) {
     return;
   }
 
+  if (isMeta && e.key === 'y') {
+    const { layers, selectedLayerId } = useLayerStore.getState();
+    const current = { layers: layers.map(l => ({ ...l, fabricObject: null })), selectedLayerId };
+    const entry = useHistoryStore.getState().redo(current);
+    if (entry) {
+      useLayerStore.getState().setLayers(entry.layers);
+      useLayerStore.getState().selectLayer(entry.selectedLayerId);
+    }
+    return;
+  }
+
   if (isMeta && e.key === 'd') {
     const { selectedLayerId, layers } = useLayerStore.getState();
     if (!selectedLayerId) return;
@@ -118,6 +129,21 @@ describe('keyboard shortcuts', () => {
 
     // Redo
     handleKeyDown(new KeyboardEvent('keydown', { key: 'z', metaKey: true, shiftKey: true }));
+    expect(useLayerStore.getState().layers).toHaveLength(0);
+  });
+
+  it('Ctrl+Y redoes undone action', () => {
+    const id = useLayerStore.getState().addLayer({ type: 'text', name: 'Keep', fabricObject: null });
+    useLayerStore.getState().selectLayer(id);
+
+    const { layers, selectedLayerId } = useLayerStore.getState();
+    useHistoryStore.getState().pushState({ layers: layers.map(l => ({ ...l, fabricObject: null })), selectedLayerId });
+    useLayerStore.getState().removeLayer(id);
+
+    handleKeyDown(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
+    expect(useLayerStore.getState().layers).toHaveLength(1);
+
+    handleKeyDown(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true }));
     expect(useLayerStore.getState().layers).toHaveLength(0);
   });
 

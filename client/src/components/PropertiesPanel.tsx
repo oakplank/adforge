@@ -24,7 +24,7 @@ function PropertyField({ label, value, onChange, min, max, step = 1 }: {
         min={min}
         max={max}
         step={step}
-        className="flex-1 bg-zinc-700 text-zinc-100 text-xs rounded px-2 py-1 outline-none focus:ring-1 focus:ring-orange-400"
+        className="flex-1 text-zinc-100 text-xs rounded px-2 py-1 outline-none border border-white/10 bg-white/[0.05] focus:ring-1 focus:ring-indigo-400"
         data-testid={`prop-${label.toLowerCase()}`}
       />
     </div>
@@ -120,18 +120,18 @@ export function PropertiesPanel() {
 
   return (
     <div className="p-3 space-y-3" data-testid="properties-fields">
-      <div className="text-xs font-medium text-zinc-300 truncate">{selectedLayer.name}</div>
+      <div className="props-layer-title">{selectedLayer.name}</div>
 
-      <div className="space-y-2">
-        <div className="text-xs text-zinc-500 uppercase tracking-wider">Position</div>
+      <div className="props-section">
+        <div className="props-section-title">Position</div>
         <div className="grid grid-cols-2 gap-2">
           <PropertyField label="X" value={transform.left} onChange={(v) => updateTransformField('left', v)} />
           <PropertyField label="Y" value={transform.top} onChange={(v) => updateTransformField('top', v)} />
         </div>
       </div>
 
-      <div className="space-y-2">
-        <div className="text-xs text-zinc-500 uppercase tracking-wider">Size</div>
+      <div className="props-section">
+        <div className="props-section-title">Size</div>
         <div className="grid grid-cols-2 gap-2">
           <PropertyField label="W" value={transform.width * transform.scaleX} onChange={(v) => {
             if (transform.width > 0) updateTransformField('scaleX', v / transform.width);
@@ -142,8 +142,8 @@ export function PropertiesPanel() {
         </div>
       </div>
 
-      <div className="space-y-2">
-        <div className="text-xs text-zinc-500 uppercase tracking-wider">Rotation</div>
+      <div className="props-section">
+        <div className="props-section-title">Rotation</div>
         <PropertyField label="°" value={transform.angle} onChange={(v) => updateTransformField('angle', v)} step={1} />
       </div>
 
@@ -154,8 +154,8 @@ export function PropertiesPanel() {
 
       {selectedLayer.type === 'image' && <ImageControls layer={selectedLayer} />}
 
-      <div className="space-y-2">
-        <div className="text-xs text-zinc-500 uppercase tracking-wider">Opacity</div>
+      <div className="props-section">
+        <div className="props-section-title">Opacity</div>
         <div className="flex items-center gap-2">
           <input
             type="range"

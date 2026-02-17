@@ -33,7 +33,7 @@ export function useKeyboardShortcuts() {
 
       const isMeta = e.metaKey || e.ctrlKey;
 
-      // Cmd+Z / Cmd+Shift+Z — undo/redo
+      // Cmd/Ctrl+Z / Cmd/Ctrl+Shift+Z — undo/redo
       if (isMeta && e.key === 'z') {
         e.preventDefault();
         const { layers, selectedLayerId } = useLayerStore.getState();
@@ -51,6 +51,19 @@ export function useKeyboardShortcuts() {
             useLayerStore.getState().setLayers(entry.layers);
             useLayerStore.getState().selectLayer(entry.selectedLayerId);
           }
+        }
+        return;
+      }
+
+      // Cmd/Ctrl+Y — redo (Windows-style)
+      if (isMeta && e.key === 'y') {
+        e.preventDefault();
+        const { layers, selectedLayerId } = useLayerStore.getState();
+        const current = { layers: stripFabricObjects(layers), selectedLayerId };
+        const entry = useHistoryStore.getState().redo(current);
+        if (entry) {
+          useLayerStore.getState().setLayers(entry.layers);
+          useLayerStore.getState().selectLayer(entry.selectedLayerId);
         }
         return;
       }

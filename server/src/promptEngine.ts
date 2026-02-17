@@ -85,7 +85,7 @@ interface BrandProfile {
   summary: string;
   primaryColor: string;
   secondaryColor: string;
-  preferredAlignment: 'left' | 'center' | 'right';
+  preferredAlignment: 'left' | 'center' | 'right' | 'auto';
   styleProfileOverride?: keyof typeof STYLE_PROFILES;
 }
 
@@ -185,7 +185,7 @@ export const CATEGORY_CONFIGS: Record<string, CategoryConfig> = {
   tech: {
     photographyStyle: 'premium consumer-tech product photography with precision reflections',
     lightingStyle: 'controlled cool studio lighting with polished highlights',
-    backgroundStyle: 'minimal gradient or engineered surface with low visual noise',
+    backgroundStyle: 'minimal engineered surface with soft tonal continuity and low visual noise',
     colorPalette: 'cool neutrals and metallic tones with restrained accent',
     depthOfField: 'deep depth of field for product edges, materials, and interfaces',
   },
@@ -320,7 +320,7 @@ const PARTINGWORD_BRAND: BrandProfile = {
   summary: 'an end-of-life messaging platform focused on compassionate legacy communication',
   primaryColor: '#1E4D3A',
   secondaryColor: '#F1E9DA',
-  preferredAlignment: 'right',
+  preferredAlignment: 'auto',
   styleProfileOverride: 'professional',
 };
 
@@ -329,7 +329,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   fashion: ['dress', 'shirt', 'jacket', 'sneakers', 'shoes', 'jeans', 'clothing', 'outfit', 'wear', 'fashion', 'apparel', 'hoodie', 'coat', 'boots', 'bag'],
   tech: ['laptop', 'phone', 'headphones', 'tablet', 'computer', 'gadget', 'app', 'software', 'smartphone', 'tech', 'device', 'camera', 'speaker', 'monitor', 'keyboard'],
   beauty: ['lipstick', 'skincare', 'perfume', 'makeup', 'mascara', 'foundation', 'serum', 'moisturizer', 'beauty', 'cosmetic', 'lotion', 'cream', 'sunscreen'],
-  fitness: ['workout', 'gym', 'protein', 'yoga', 'fitness', 'exercise', 'training', 'muscle', 'supplement', 'weights', 'running', 'cycle'],
+  fitness: ['workout', 'gym', 'protein', 'yoga', 'fitness', 'exercise', 'training', 'muscle', 'supplement', 'weights', 'running', 'cycle', 'athlete', 'athletics', 'camp', 'clinic', 'showcase', 'combine'],
   travel: ['travel', 'flight', 'hotel', 'vacation', 'trip', 'destination', 'resort', 'booking', 'tour', 'adventure', 'airline'],
   home: ['furniture', 'decor', 'sofa', 'lamp', 'kitchen', 'bedroom', 'living room', 'home', 'interior', 'candle', 'cookware'],
   automotive: ['car', 'vehicle', 'auto', 'driving', 'motor', 'truck', 'suv', 'sedan', 'automotive', 'ev'],
@@ -599,7 +599,7 @@ function buildCreativeThoughtSession(input: {
 }
 
 function hasOfferLanguage(text: string): boolean {
-  return /(off|sale|discount|deal|save|bogo|buy one|get one|coupon|free shipping|limited time|today only)/i.test(text);
+  return /\b(\d+%\s*off|\$\d+\s*off|sale|discount|deal|save|bogo|buy\s+one|get\s+one|coupon|free\s+shipping|limited\s+time|today\s+only)\b/i.test(text);
 }
 
 function resolveObjectiveStrategy(objective: Objective): ObjectiveStrategy {
@@ -705,7 +705,22 @@ function deriveIntent(description: string, objective: Objective, brand?: BrandPr
 }
 
 function countKeywordMatches(text: string, terms: string[]): number {
-  return terms.reduce((sum, term) => (text.includes(term) ? sum + 1 : sum), 0);
+  return terms.reduce((sum, term) => (hasTerm(text, term) ? sum + 1 : sum), 0);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function hasTerm(text: string, term: string): boolean {
+  if (!term.trim()) return false;
+  const pattern = term
+    .trim()
+    .split(/\s+/)
+    .map((token) => escapeRegExp(token))
+    .join('\\s+');
+  const rx = new RegExp(`\\b${pattern}\\b`, 'i');
+  return rx.test(text);
 }
 
 function buildInterpretiveLayer(input: {
@@ -1000,10 +1015,10 @@ function buildRenderPrompt(input: {
       ? 'right'
       : brand?.preferredAlignment === 'left'
         ? 'left'
-        : 'right';
-  const contrastLaneInstruction = `The ${laneSide} 45% of the frame must maintain consistent low-detail tonality for high-contrast text overlay. Avoid gradient shifts, bokeh orbs, and texture changes in this zone.`;
+        : 'left or right (choose the cleaner side for this specific scene)';
+  const contrastLaneInstruction = `Prefer the ${laneSide} outer 30-40% of the frame to remain naturally low-detail and tonally consistent for text overlay legibility. Avoid abrupt tonal jumps, noisy bokeh clusters, and texture spikes in this region.`;
   const laneNaturalnessInstruction =
-    'Text-supporting negative space must come from a natural scene surface (wall, curtain, sky, soft depth), never a synthetic split-screen panel, hard vertical wipe, or artificial side bar.';
+    'Text-supporting negative space must come from a natural scene surface (wall, curtain, sky, soft depth), never a synthetic split-screen panel, hard vertical wipe, artificial side bar, or generated gradient strip.';
   const sceneCoherenceInstruction =
     brand?.id === 'partingword'
       ? 'Use one coherent narrative scene with one primary anchor object and supporting props from the same world. Do not mix app UI symbols with unrelated physical props. Human presence should be subtle and natural (hands or partial person), not staged.'
@@ -1066,6 +1081,7 @@ function buildRenderPrompt(input: {
     `Avoid perfectly centered hero placement unless explicitly requested; bias subject to one third to preserve clean text lanes.`,
     contrastLaneInstruction,
     laneNaturalnessInstruction,
+    `Do not fabricate gradient rows, columns, cream sidebars, blur strips, or matte color bands to fake text lanes; leave overlay gradients to downstream editor controls.`,
     textSafeZoneInstructions,
     `Category insight: ${categoryArchetype.categoryInsight}.`,
     `Authenticity: visible natural material texture, non-posed realism, and believable lighting falloff.`,
@@ -1091,6 +1107,7 @@ function buildSystemPrompt(profile: StyleProfile, objective: Objective, brand?: 
     `Keep narrative logic consistent: one scene, one clear subject, no random symbolic collisions.`,
     `Reject bland defaults (single object on plain white background, centered tabletop symmetry) unless user explicitly asks for that style.`,
     `Never output synthetic split-screen side panels, matte borders, letterboxing, or hard-edge vertical wipes intended to fake text lanes.`,
+    `Never bake in gradient bars/rows/side scrims to reserve copy space; text-support elements are downstream and user-editable.`,
     `Never output legible text in-scene (including quotes, labels, signage, handwriting, UI text, or watermark-like artifacts).`,
     `Hard constraints: no text, no logos, no watermark, no cheap ecommerce aesthetic, no generic stock-photo energy.`,
     `Keep negative space intentional so downstream layout can place headline, subhead, and CTA.`,
@@ -1101,7 +1118,7 @@ function buildSystemPrompt(profile: StyleProfile, objective: Objective, brand?: 
 export function detectCategory(product: string, description: string): string {
   const text = `${product} ${description}`.toLowerCase();
   for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (keywords.some((keyword) => text.includes(keyword))) {
+    if (keywords.some((keyword) => hasTerm(text, keyword))) {
       return category;
     }
   }

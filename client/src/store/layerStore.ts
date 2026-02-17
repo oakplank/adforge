@@ -147,7 +147,18 @@ export const useLayerStore = create<LayerStore>((set, get) => ({
       layers: s.layers.map((l) => {
         if (l.id !== id) return l;
         const current = l.shapeStyle ?? {
-          fill: '#ff6a3d', stroke: '#000000', strokeWidth: 0, cornerRadius: 0,
+          fill: '#ff6a3d',
+          stroke: '#000000',
+          strokeWidth: 0,
+          cornerRadius: 0,
+          fillMode: 'solid' as const,
+          gradient: {
+            startColor: '#1E4D3A',
+            endColor: '#1E4D3A',
+            startOpacity: 0,
+            endOpacity: 0.78,
+            angle: 0,
+          },
         };
         return { ...l, shapeStyle: { ...current, ...style } };
       }),

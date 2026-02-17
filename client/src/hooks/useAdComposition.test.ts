@@ -78,7 +78,7 @@ describe('Ad Composition', () => {
     store.addLayer({ type: 'background', name: 'Background Image', fabricObject: null });
     store.addLayer({ type: 'text', name: 'Headline', fabricObject: null });
     store.addLayer({ type: 'text', name: 'Subhead', fabricObject: null });
-    store.addLayer({ type: 'shape', name: 'CTA Button', fabricObject: null });
+    store.addLayer({ type: 'text', name: 'CTA', fabricObject: null });
 
     const layers = useLayerStore.getState().layers;
     expect(layers).toHaveLength(4);
@@ -88,8 +88,8 @@ describe('Ad Composition', () => {
     expect(layers[1].type).toBe('text');
     expect(layers[2].name).toBe('Subhead');
     expect(layers[2].type).toBe('text');
-    expect(layers[3].name).toBe('CTA Button');
-    expect(layers[3].type).toBe('shape');
+    expect(layers[3].name).toBe('CTA');
+    expect(layers[3].type).toBe('text');
   });
 
   it('should clear existing layers before composing', () => {

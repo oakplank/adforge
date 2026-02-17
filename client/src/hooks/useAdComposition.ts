@@ -263,9 +263,20 @@ function estimateTextboxWidth(
   const charsPerLine = role === 'headline' ? 16 : role === 'subhead' ? 26 : 18;
   const avgCharWidth = role === 'headline' ? 0.56 : role === 'subhead' ? 0.5 : 0.58;
   const estimated = (normalized.length / charsPerLine) * fontSize * charsPerLine * avgCharWidth;
-  const minWidth = laneWidth * (role === 'headline' ? 0.58 : role === 'subhead' ? 0.52 : 0.34);
+  const minWidth = laneWidth * (role === 'headline' ? 0.42 : role === 'subhead' ? 0.34 : 0.2);
   const maxWidth = laneWidth * (role === 'cta' ? 0.92 : 1);
   return clamp(estimated, minWidth, maxWidth);
+}
+
+function resolveAdaptiveScrimRadius(
+  baseRadius: number,
+  text: string,
+  role: 'headline' | 'subhead' | 'cta'
+): number {
+  const length = text.trim().length;
+  const roleShift = role === 'headline' ? 0 : role === 'subhead' ? -3 : -6;
+  const compactShift = length < 18 ? 3 : length > 60 ? -4 : length > 36 ? -2 : 0;
+  return Math.round(clamp(baseRadius + roleShift + compactShift, 6, 24));
 }
 
 function positionByAlignment(
@@ -577,6 +588,14 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
       const subheadBaseStyle = resolveTemplateTextStyle(slots, 'subhead', textColor);
       const ctaPx = toPixels(placementPlan.cta, canvasWidth, canvasHeight);
       const laneGap = canvasHeight * 0.02;
+      const headlineText = textTreatment.uppercaseHeadline
+        ? adSpec.texts.headline.toUpperCase()
+        : adSpec.texts.headline;
+      const headlineScrimRadius = resolveAdaptiveScrimRadius(
+        textTreatment.scrimRadius,
+        headlineText,
+        'headline'
+      );
 
       const headlineScrim = addScrimIfNeeded(
         canvas,
@@ -587,15 +606,12 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
         canvasHeight,
         {
           mode: textTreatment.scrimMode,
-          radius: textTreatment.scrimRadius,
+          radius: headlineScrimRadius,
           opacityScale: textTreatment.scrimOpacityScale,
         }
       );
       const headlinePx = toPixels(placementPlan.headline, canvasWidth, canvasHeight);
       const headlineSize = clamp(Math.round(headlinePx.height * 0.58), 34, formatId === 'story' ? 112 : 88);
-      const headlineText = textTreatment.uppercaseHeadline
-        ? adSpec.texts.headline.toUpperCase()
-        : adSpec.texts.headline;
       const headlineWidth = estimateTextboxWidth(
         headlineText,
         headlineSize,
@@ -628,6 +644,14 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
       trimTextToHeight(headlineTextbox, headlineText, headlinePx.height);
       canvas.add(headlineTextbox);
       if (headlineScrim) {
+        const headlineBackdropMaxWidth = Math.max(
+          headlineWidth + headlineScrim.padX * 2,
+          headlinePx.width * 0.88
+        );
+        const headlineBackdropMinWidth = Math.min(
+          headlineBackdropMaxWidth,
+          Math.max(headlineSize * 2.7, Math.min(headlinePx.width * 0.28, headlineWidth * 0.86))
+        );
         linkBackdropToTextbox(
           canvas,
           headlineTextbox,
@@ -637,8 +661,8 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
           0,
           {
             fitToText: true,
-            minWidth: headlinePx.width * 0.44,
-            maxWidth: headlinePx.width + headlineScrim.padX * 2,
+            minWidth: headlineBackdropMinWidth,
+            maxWidth: headlineBackdropMaxWidth,
           }
         );
       }
@@ -664,7 +688,11 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
         canvasHeight,
         {
           mode: textTreatment.scrimMode === 'solid' ? 'minimal' : textTreatment.scrimMode,
-          radius: Math.max(6, textTreatment.scrimRadius - 4),
+          radius: resolveAdaptiveScrimRadius(
+            Math.max(6, textTreatment.scrimRadius - 4),
+            adSpec.texts.subhead,
+            'subhead'
+          ),
           opacityScale: textTreatment.scrimOpacityScale * 0.92,
         }
       );
@@ -709,6 +737,14 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
       trimTextToHeight(subheadTextbox, adSpec.texts.subhead, maxSubheadHeight);
       canvas.add(subheadTextbox);
       if (subheadScrim) {
+        const subheadBackdropMaxWidth = Math.max(
+          subheadWidth + subheadScrim.padX * 2,
+          subheadPx.width * 0.9
+        );
+        const subheadBackdropMinWidth = Math.min(
+          subheadBackdropMaxWidth,
+          Math.max(subheadSize * 5.1, Math.min(subheadPx.width * 0.24, subheadWidth * 0.84))
+        );
         linkBackdropToTextbox(
           canvas,
           subheadTextbox,
@@ -718,8 +754,8 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
           0,
           {
             fitToText: true,
-            minWidth: subheadPx.width * 0.4,
-            maxWidth: subheadPx.width + subheadScrim.padX * 2,
+            minWidth: subheadBackdropMinWidth,
+            maxWidth: subheadBackdropMaxWidth,
           }
         );
       }
@@ -739,7 +775,11 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
 
       addScrimIfNeeded(canvas, addLayer, 'CTA', placementPlan.cta, canvasWidth, canvasHeight, {
         mode: textTreatment.scrimMode === 'none' ? 'none' : 'minimal',
-        radius: Math.max(6, textTreatment.scrimRadius - 6),
+        radius: resolveAdaptiveScrimRadius(
+          Math.max(6, textTreatment.scrimRadius - 6),
+          adSpec.texts.cta,
+          'cta'
+        ),
         opacityScale: textTreatment.scrimOpacityScale * 0.86,
       });
       const ctaTextSize = clamp(Math.round(headlineSize * 0.34), 14, 30);
@@ -759,8 +799,14 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
         ctaWidth,
         placementPlan.cta.align || 'center'
       );
-      const ctaPadX = canvasWidth * (textTreatment.ctaMode === 'label' ? 0.008 : 0.012);
-      const ctaPadY = canvasHeight * (textTreatment.ctaMode === 'label' ? 0.004 : 0.007);
+      const compactCtaLength = ctaLabel.replace(/\s+/g, '').length;
+      const ctaPadX = canvasWidth * clamp(
+        (textTreatment.ctaMode === 'label' ? 0.0058 : 0.0076) + Math.min(0.0038, compactCtaLength * 0.00008),
+        0.0055,
+        0.013
+      );
+      const ctaPadY = canvasHeight * (textTreatment.ctaMode === 'label' ? 0.0034 : 0.0052);
+      const ctaRadius = resolveAdaptiveScrimRadius(textTreatment.ctaRadius, ctaLabel, 'cta');
 
       let ctaStrip: Rect | null = null;
       if (textTreatment.ctaMode !== 'ghost') {
@@ -769,8 +815,8 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
           top: ctaTop - ctaPadY,
           width: ctaWidth + ctaPadX * 2,
           height: ctaPx.height + ctaPadY * 2,
-          rx: textTreatment.ctaRadius,
-          ry: textTreatment.ctaRadius,
+          rx: ctaRadius,
+          ry: ctaRadius,
           selectable: false,
           evented: false,
           strokeWidth: 0,
@@ -782,8 +828,8 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
           ctaRectConfig.strokeWidth = 2;
         } else if (textTreatment.ctaMode === 'label') {
           ctaRectConfig.fill = hexToRgba(adSpec.colors.background || '#132B20', textTreatment.ctaFillAlpha);
-          ctaRectConfig.rx = Math.max(6, textTreatment.ctaRadius - 4);
-          ctaRectConfig.ry = Math.max(6, textTreatment.ctaRadius - 4);
+          ctaRectConfig.rx = Math.max(5, ctaRadius - 3);
+          ctaRectConfig.ry = Math.max(5, ctaRadius - 3);
         } else {
           ctaRectConfig.fill = hexToRgba(adSpec.colors.background || '#132B20', textTreatment.ctaFillAlpha);
         }

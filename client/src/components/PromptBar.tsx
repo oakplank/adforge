@@ -8,7 +8,7 @@ export interface PromptBarProps {
 }
 
 const QUICK_PROMPTS = [
-  'Launch a premium cold brew subscription for busy designers, calm luxe vibe, neutral + copper palette.',
+  'PartingWord.com end-of-life messaging platform launch, compassionate modern aesthetic, dark green and light cream beige palette.',
   'Weekend flash sale 30% off running shoes for city commuters, kinetic energy, black + orange.',
   'New skincare serum for sensitive skin, clean minimal vibe, soft blue and white palette.',
 ];
@@ -42,6 +42,12 @@ export function PromptBar({ onGenerated }: PromptBarProps) {
       <div className="prompt-meta-row">
         <span className="prompt-hint">Single prompt input. We auto-tune style, quality, and safe zones.</span>
         <span className="prompt-format">Output: {format.label} {format.width}x{format.height}</span>
+      </div>
+
+      <div className="prompt-shortcuts">
+        <span className="shortcut-badge">⌘/Ctrl + Enter: Generate</span>
+        <span className="shortcut-badge">⌘/Ctrl + Z: Undo</span>
+        <span className="shortcut-badge">⌘/Ctrl + Shift + Z or Y: Redo</span>
       </div>
 
       <div className="prompt-input-row">
