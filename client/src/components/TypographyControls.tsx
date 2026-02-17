@@ -1,7 +1,7 @@
 import { Shadow } from 'fabric';
 import { useLayerStore } from '../store/layerStore';
-import { AVAILABLE_FONTS, DEFAULT_TEXT_STYLE } from '../types/layers';
-import type { TextStyle } from '../types/layers';
+import { AVAILABLE_FONTS, DEFAULT_TEXT_STYLE, BRAND_TEXT_PRESETS } from '../types/layers';
+import type { TextStyle, TokenRole } from '../types/layers';
 
 export function TypographyControls() {
   const selectedLayerId = useLayerStore((s) => s.selectedLayerId);
@@ -13,6 +13,26 @@ export function TypographyControls() {
   if (!selectedLayer || selectedLayer.type !== 'text') return null;
 
   const style: TextStyle = selectedLayer.textStyle ?? DEFAULT_TEXT_STYLE;
+
+  const currentRole: TokenRole | 'custom' = style.tokenRole ?? 'custom';
+
+  const handleRoleChange = (role: TokenRole | 'custom') => {
+    if (role === 'custom') {
+      update({ tokenRole: undefined });
+    } else {
+      const preset = BRAND_TEXT_PRESETS[role];
+      const clampedSize = Math.min(Math.max(style.fontSize, preset.fontSizeMin), preset.fontSizeMax);
+      update({
+        tokenRole: role,
+        fontFamily: preset.fontFamily,
+        fontWeight: preset.fontWeight,
+        fontSize: clampedSize,
+      });
+    }
+  };
+
+  const fontSizeMin = currentRole !== 'custom' ? BRAND_TEXT_PRESETS[currentRole].fontSizeMin : 1;
+  const fontSizeMax = currentRole !== 'custom' ? BRAND_TEXT_PRESETS[currentRole].fontSizeMax : 500;
 
   const update = (partial: Partial<TextStyle>) => {
     if (!selectedLayerId) return;
@@ -48,6 +68,22 @@ export function TypographyControls() {
     <div className="space-y-3" data-testid="typography-controls">
       <div className="text-xs text-zinc-500 uppercase tracking-wider">Typography</div>
 
+      {/* Token Role */}
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-zinc-400 w-10 shrink-0">Role</label>
+        <select
+          value={currentRole}
+          onChange={(e) => handleRoleChange(e.target.value as TokenRole | 'custom')}
+          className="flex-1 bg-zinc-700 text-zinc-100 text-xs rounded px-2 py-1 outline-none focus:ring-1 focus:ring-orange-400"
+          data-testid="typo-token-role"
+        >
+          <option value="headline">Headline</option>
+          <option value="subhead">Subhead</option>
+          <option value="body">Body</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+
       {/* Font Family */}
       <div className="flex items-center gap-2">
         <label className="text-xs text-zinc-400 w-10 shrink-0">Font</label>
@@ -70,8 +106,8 @@ export function TypographyControls() {
           type="number"
           value={style.fontSize}
           onChange={(e) => update({ fontSize: Number(e.target.value) })}
-          min={1}
-          max={500}
+          min={fontSizeMin}
+          max={fontSizeMax}
           className="flex-1 bg-zinc-700 text-zinc-100 text-xs rounded px-2 py-1 outline-none focus:ring-1 focus:ring-orange-400"
           data-testid="typo-font-size"
         />

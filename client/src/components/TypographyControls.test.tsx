@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TypographyControls } from './TypographyControls';
 import { useLayerStore } from '../store/layerStore';
+import { BRAND_TEXT_PRESETS } from '../types/layers';
 import type { TextStyle } from '../types/layers';
 
 const baseTextStyle: TextStyle = {
@@ -146,5 +147,80 @@ describe('TypographyControls', () => {
     render(<TypographyControls />);
     fireEvent.click(screen.getByTestId('typo-shadow-toggle'));
     expect(useLayerStore.getState().layers[0].textStyle?.shadow).toBeNull();
+  });
+
+  // Token Role tests
+  it('renders token role dropdown with all options', () => {
+    setupTextLayer();
+    render(<TypographyControls />);
+    const select = screen.getByTestId('typo-token-role');
+    expect(select).toBeInTheDocument();
+    const options = select.querySelectorAll('option');
+    const values = Array.from(options).map((o) => o.value);
+    expect(values).toEqual(['headline', 'subhead', 'body', 'custom']);
+  });
+
+  it('defaults to custom when no tokenRole set', () => {
+    setupTextLayer();
+    render(<TypographyControls />);
+    expect(screen.getByTestId('typo-token-role')).toHaveValue('custom');
+  });
+
+  it('selecting headline role applies preset fontFamily, fontWeight and constrains size', () => {
+    setupTextLayer({ fontSize: 48 });
+    render(<TypographyControls />);
+    fireEvent.change(screen.getByTestId('typo-token-role'), { target: { value: 'headline' } });
+    const s = useLayerStore.getState().layers[0].textStyle!;
+    expect(s.tokenRole).toBe('headline');
+    expect(s.fontFamily).toBe(BRAND_TEXT_PRESETS.headline.fontFamily);
+    expect(s.fontWeight).toBe(BRAND_TEXT_PRESETS.headline.fontWeight);
+    expect(s.fontSize).toBeGreaterThanOrEqual(BRAND_TEXT_PRESETS.headline.fontSizeMin);
+    expect(s.fontSize).toBeLessThanOrEqual(BRAND_TEXT_PRESETS.headline.fontSizeMax);
+  });
+
+  it('selecting headline clamps font size to max when too large', () => {
+    setupTextLayer({ fontSize: 200 });
+    render(<TypographyControls />);
+    fireEvent.change(screen.getByTestId('typo-token-role'), { target: { value: 'headline' } });
+    expect(useLayerStore.getState().layers[0].textStyle!.fontSize).toBe(BRAND_TEXT_PRESETS.headline.fontSizeMax);
+  });
+
+  it('selecting body clamps font size to min when too small', () => {
+    setupTextLayer({ fontSize: 5 });
+    render(<TypographyControls />);
+    fireEvent.change(screen.getByTestId('typo-token-role'), { target: { value: 'body' } });
+    expect(useLayerStore.getState().layers[0].textStyle!.fontSize).toBe(BRAND_TEXT_PRESETS.body.fontSizeMin);
+  });
+
+  it('headline role constrains font size input min/max', () => {
+    setupTextLayer({ tokenRole: 'headline', fontSize: 48 });
+    render(<TypographyControls />);
+    const sizeInput = screen.getByTestId('typo-font-size');
+    expect(sizeInput).toHaveAttribute('min', String(BRAND_TEXT_PRESETS.headline.fontSizeMin));
+    expect(sizeInput).toHaveAttribute('max', String(BRAND_TEXT_PRESETS.headline.fontSizeMax));
+  });
+
+  it('custom role allows unconstrained font size (1-500)', () => {
+    setupTextLayer();
+    render(<TypographyControls />);
+    const sizeInput = screen.getByTestId('typo-font-size');
+    expect(sizeInput).toHaveAttribute('min', '1');
+    expect(sizeInput).toHaveAttribute('max', '500');
+  });
+
+  it('switching to custom clears tokenRole', () => {
+    setupTextLayer({ tokenRole: 'headline', fontSize: 48 });
+    render(<TypographyControls />);
+    fireEvent.change(screen.getByTestId('typo-token-role'), { target: { value: 'custom' } });
+    expect(useLayerStore.getState().layers[0].textStyle!.tokenRole).toBeUndefined();
+  });
+
+  it('selecting subhead applies subhead preset', () => {
+    setupTextLayer({ fontSize: 24 });
+    render(<TypographyControls />);
+    fireEvent.change(screen.getByTestId('typo-token-role'), { target: { value: 'subhead' } });
+    const s = useLayerStore.getState().layers[0].textStyle!;
+    expect(s.fontFamily).toBe(BRAND_TEXT_PRESETS.subhead.fontFamily);
+    expect(s.fontWeight).toBe(BRAND_TEXT_PRESETS.subhead.fontWeight);
   });
 });
