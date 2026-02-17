@@ -13,6 +13,52 @@ export interface LayerTransform {
   angle: number;
 }
 
+export type TokenRole = 'headline' | 'subhead' | 'body' | 'cta';
+
+export interface BrandTextPreset {
+  fontFamily: string;
+  fontSizeMin: number;
+  fontSizeMax: number;
+  fontWeight: 'normal' | 'bold';
+  letterSpacing: number;
+  lineHeight: number;
+}
+
+export const BRAND_TEXT_PRESETS: Record<TokenRole, BrandTextPreset> = {
+  headline: {
+    fontFamily: 'Space Grotesk',
+    fontSizeMin: 28,
+    fontSizeMax: 72,
+    fontWeight: 'bold',
+    letterSpacing: -0.5,
+    lineHeight: 1.1,
+  },
+  subhead: {
+    fontFamily: 'Manrope',
+    fontSizeMin: 18,
+    fontSizeMax: 36,
+    fontWeight: 'normal',
+    letterSpacing: 0,
+    lineHeight: 1.3,
+  },
+  body: {
+    fontFamily: 'Manrope',
+    fontSizeMin: 14,
+    fontSizeMax: 24,
+    fontWeight: 'normal',
+    letterSpacing: 0.1,
+    lineHeight: 1.5,
+  },
+  cta: {
+    fontFamily: 'Space Grotesk',
+    fontSizeMin: 16,
+    fontSizeMax: 28,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+    lineHeight: 1.2,
+  },
+};
+
 export interface TextStyle {
   fontFamily: string;
   fontSize: number;
@@ -21,6 +67,7 @@ export interface TextStyle {
   fontStyle: 'normal' | 'italic';
   underline: boolean;
   textAlign: 'left' | 'center' | 'right';
+  tokenRole?: TokenRole;
   shadow: {
     offsetX: number;
     offsetY: number;
@@ -30,8 +77,8 @@ export interface TextStyle {
 }
 
 export const DEFAULT_TEXT_STYLE: TextStyle = {
-  fontFamily: 'Space Grotesk',
-  fontSize: 48,
+  fontFamily: BRAND_TEXT_PRESETS.headline.fontFamily,
+  fontSize: BRAND_TEXT_PRESETS.headline.fontSizeMax,
   fill: '#ffffff',
   fontWeight: 'normal',
   fontStyle: 'normal',
@@ -63,8 +110,8 @@ export const DEFAULT_CTA_STYLE: CtaStyle = {
   textContent: 'Shop Now',
   textColor: '#ffffff',
   cornerRadius: 8,
-  paddingX: 32,
-  paddingY: 12,
+  paddingX: BRAND_TEXT_PRESETS.cta.fontSizeMax,
+  paddingY: Math.round(BRAND_TEXT_PRESETS.cta.fontSizeMax * 0.4),
 };
 
 export interface Layer {

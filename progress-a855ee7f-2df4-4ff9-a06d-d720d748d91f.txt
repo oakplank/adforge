@@ -50,3 +50,13 @@
 - Added 8 new tests: intent in metadata, backward compat, invalid intent ignored, different copy for retargeting vs conversion, all three intents accepted, generateAdSpec direct tests
 - All 292 tests pass, typecheck passes
 ---
+
+## 2026-02-16 21:24 - US-009: Update client-side safe zone types and format constants
+- Updated `client/src/types/safeZones.ts`: added optional topMargin, bottomMargin, rightMargin to SafeZoneConfig; story gets 14% top / 35% bottom; added reel format with 15% right margin
+- Updated `client/src/types/formats.ts`: added reel format (1080x1920)
+- Updated `getSafeZonePixels` to use asymmetric margins when present
+- Created `client/src/types/safeZones.test.ts` (11 tests) and `client/src/types/formats.test.ts` (4 tests)
+- Fixed `client/src/hooks/useGridOverlay.test.ts` and `client/src/components/FormatSelector.test.tsx` for new format count and margins
+- All 221 client tests pass, typecheck passes
+- **Learnings:** Client vitest has globals: true, so import from vitest is optional but explicit is fine
+---
