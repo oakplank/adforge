@@ -42,3 +42,11 @@
 - Added 8 new tests: intent acceptance, retargeting CTAs, retargeting CTA count, formula differentiation between intents, awareness formula verification, conversion CTAs, char limits for all intents, backward compatibility without intent
 - All 285 tests pass, typecheck passes
 ---
+
+## 2026-02-16 20:33 - US-008: Wire intent presets into generateAd endpoint
+- Updated `server/src/generateAd.ts`: added `intent` to AdSpec metadata type, `generateAdSpec` signature, endpoint request body parsing
+- Intent is validated against allowed values; invalid values are silently ignored
+- Passes intent through to `generateCopy` and `generateLayout`
+- Added 8 new tests: intent in metadata, backward compat, invalid intent ignored, different copy for retargeting vs conversion, all three intents accepted, generateAdSpec direct tests
+- All 292 tests pass, typecheck passes
+---
