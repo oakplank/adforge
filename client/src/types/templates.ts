@@ -309,4 +309,6 @@ const MINIMAL: AdTemplate = {
   ],
 };
 
-export const BUILT_IN_TEMPLATES: AdTemplate[] = [BOLD_SALE, PRODUCT_SHOWCASE, MINIMAL];
+import { BEFORE_TEMPLATE, AFTER_TEMPLATE } from './exampleTemplates';
+
+export const BUILT_IN_TEMPLATES: AdTemplate[] = [BOLD_SALE, PRODUCT_SHOWCASE, MINIMAL, BEFORE_TEMPLATE, AFTER_TEMPLATE];

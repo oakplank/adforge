@@ -12,8 +12,8 @@ const SLOT_TYPES: SlotType[] = ['headline', 'subhead', 'cta', 'logo', 'productIm
 const FORMAT_IDS = ['square', 'portrait', 'story'];
 
 describe('AdTemplate types and built-in templates', () => {
-  it('has exactly 3 built-in templates', () => {
-    expect(BUILT_IN_TEMPLATES).toHaveLength(3);
+  it('has exactly 5 built-in templates', () => {
+    expect(BUILT_IN_TEMPLATES).toHaveLength(5);
   });
 
   it('templates have expected names', () => {
@@ -76,7 +76,7 @@ describe('getTemplateById', () => {
 describe('getAllTemplates', () => {
   it('returns a copy of all templates', () => {
     const all = getAllTemplates();
-    expect(all).toHaveLength(3);
+    expect(all).toHaveLength(5);
     expect(all).not.toBe(BUILT_IN_TEMPLATES); // copy
   });
 });
