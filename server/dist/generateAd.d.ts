@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { type FormatConfig, type Objective, type PromptPipeline, type PlacementPlanHints, type AgenticPlan } from './promptEngine.js';
 import { type LayoutOutput } from './layoutEngine.js';
+import type { AdIntent } from './types/textSystem.js';
 import { type WebsiteBrandKit } from './websiteBrandKit.js';
 declare const VIBE_COLOR_MAP: Record<string, {
     primary: string;
@@ -51,6 +52,7 @@ export interface AdSpec {
             targetAudience?: string;
             offerings?: string[];
         };
+        intent?: AdIntent;
         contrastRatios: {
             headline: number;
             subhead: number;
@@ -75,6 +77,6 @@ interface ParsedPrompt {
     websiteUrl?: string;
 }
 export declare function parsePrompt(prompt: string): ParsedPrompt;
-export declare function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId?: string, variantOffset?: number, brandKit?: WebsiteBrandKit): AdSpec;
+export declare function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId?: string, variantOffset?: number, brandKit?: WebsiteBrandKit, intent?: AdIntent): AdSpec;
 export declare function createGenerateAdRouter(): Router;
 export { VIBE_COLOR_MAP, COLOR_NAME_MAP };

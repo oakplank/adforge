@@ -1,10 +1,15 @@
 // Layout Engine - Text positioning, contrast checking, and visual layout
+import { TYPOGRAPHY_SCALE, SAFE_ZONE_SPECS } from './designTokens.js';
+import { calculateDynamicFontSize } from './textSizingEngine.js';
+import { getPresetForIntent, applyPresetToLayout } from './intentPresets.js';
 export const WCAG_AA_RATIO = 4.5;
+/** @deprecated Use SAFE_ZONE_SPECS from designTokens instead */
 export const SAFE_ZONES = {
     square: { top: 0.20, bottom: 0.25 },
     portrait: { top: 0.20, bottom: 0.25 },
     story: { top: 0.20, bottom: 0.30 },
 };
+/** @deprecated Use TYPOGRAPHY_SCALE from designTokens instead */
 export const FONT_SIZES = {
     headline: { min: 24, max: 72, default: 48 },
     subhead: { min: 16, max: 36, default: 24 },
@@ -57,28 +62,32 @@ export function calculateFontSize(text, config, containerWidth) {
     const idealSize = containerWidth / (text.length * charWidth);
     return Math.min(config.max, Math.max(config.min, Math.min(config.default, idealSize)));
 }
-export function generateLayout(format, headline, subhead, ctaText, bgColor, accentColor) {
+export function generateLayout(format, headline, subhead, ctaText, bgColor, accentColor, intent) {
     const dims = FORMAT_DIMENSIONS[format] || FORMAT_DIMENSIONS.square;
     const { width, height } = dims;
-    const safeZone = SAFE_ZONES[format] || SAFE_ZONES.square;
-    const safeTop = height * safeZone.top;
-    const safeBottom = height * (1 - safeZone.bottom);
+    // Use new safe zone specs when available, fall back to legacy SAFE_ZONES
+    const formatMapping = { square: 'feed', portrait: 'feed', story: 'story' };
+    const safeZoneFormat = formatMapping[format] || 'feed';
+    const safeSpec = SAFE_ZONE_SPECS.find((s) => s.format === safeZoneFormat);
+    const safeTop = safeSpec ? (safeSpec.topPercent / 100) * height : height * 0.20;
+    const safeBottom = safeSpec ? height - (safeSpec.bottomPercent / 100) * height : height * 0.75;
     const contentWidth = width * 0.8;
     const contentX = width * 0.1;
     // Text colors
     const headlineColor = findAccessibleTextColor(bgColor);
     const subheadColor = findAccessibleTextColor(bgColor);
     const ctaColor = findAccessibleTextColor(accentColor);
-    // Font sizes
-    const headlineFontSize = calculateFontSize(headline, FONT_SIZES.headline, contentWidth);
-    const subheadFontSize = calculateFontSize(subhead, FONT_SIZES.subhead, contentWidth);
-    const ctaFontSize = calculateFontSize(ctaText, FONT_SIZES.cta, contentWidth);
+    // Font sizes - use new dynamic sizing engine
+    const contentHeight = safeBottom - safeTop;
+    const headlineFontSize = calculateDynamicFontSize(headline, contentWidth, contentHeight * 0.4, TYPOGRAPHY_SCALE.headline);
+    const subheadFontSize = calculateDynamicFontSize(subhead, contentWidth, contentHeight * 0.3, TYPOGRAPHY_SCALE.subhead);
+    const ctaFontSize = calculateDynamicFontSize(ctaText, contentWidth * 0.4, contentHeight * 0.2, TYPOGRAPHY_SCALE.cta);
     // Positions - headline in safe zone, subhead below, CTA in lower third
     const headlineY = safeTop + 20;
     const subheadY = headlineY + headlineFontSize + 20;
     const ctaY = height * 0.75; // lower third
     const readingPattern = format === 'story' ? 'z-pattern' : 'f-pattern';
-    return {
+    let layout = {
         format,
         width,
         height,
@@ -119,6 +128,12 @@ export function generateLayout(format, headline, subhead, ctaText, bgColor, acce
         },
         readingPattern,
     };
+    // Apply intent preset if provided
+    if (intent) {
+        const presetConfig = getPresetForIntent(intent);
+        layout = applyPresetToLayout(layout, presetConfig);
+    }
+    return layout;
 }
 export function validateLayout(layout) {
     const warnings = [];

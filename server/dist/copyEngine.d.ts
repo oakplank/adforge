@@ -1,3 +1,4 @@
+import type { AdIntent } from './types/textSystem.js';
 export type HeadlineFormula = 'urgency' | 'benefit' | 'question' | 'announcement' | 'number' | 'curiosity' | 'proof';
 type Objective = 'offer' | 'launch' | 'awareness';
 type CtaPriority = 'high' | 'medium' | 'low';
@@ -19,6 +20,7 @@ export interface CopyInput {
     rawPrompt?: string;
     variantOffset?: number;
     planning?: CopyPlanningLayer;
+    intent?: AdIntent;
 }
 export interface CopyOutput {
     headline: string;
@@ -42,6 +44,7 @@ export declare const CHAR_LIMITS: {
     readonly subhead: 62;
     readonly cta: 16;
 };
+export declare const RETARGETING_CTA_CANDIDATES: string[];
 export declare function generateCopy(input: CopyInput): CopyOutput;
 export declare const generateAdCopy: typeof generateCopy;
 export declare function validateCopy(copy: CopyOutput): ValidationResult;

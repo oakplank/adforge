@@ -12,6 +12,7 @@ import {
   generateLayout,
   type LayoutOutput,
 } from './layoutEngine.js';
+import type { AdIntent } from './types/textSystem.js';
 import {
   extractWebsiteSignal,
   fetchWebsiteBrandKit,
@@ -92,6 +93,7 @@ export interface AdSpec {
       targetAudience?: string;
       offerings?: string[];
     };
+    intent?: AdIntent;
     contrastRatios: {
       headline: number;
       subhead: number;
@@ -261,7 +263,8 @@ export function generateAdSpec(
   format?: string,
   templateId?: string,
   variantOffset = 0,
-  brandKit?: WebsiteBrandKit
+  brandKit?: WebsiteBrandKit,
+  intent?: AdIntent
 ): AdSpec {
   let { product, offer, vibe, colors, rawPrompt } = parsed;
   const resolvedFormat = format ?? 'square';
@@ -316,6 +319,7 @@ export function generateAdSpec(
     rawPrompt: contextualRawPrompt,
     variantOffset,
     planning: copyPlanning,
+    intent,
   });
 
   const copyValidation = validateCopy(copy);
@@ -348,7 +352,8 @@ export function generateAdSpec(
     copy.subhead,
     copy.cta,
     adColors.background,
-    adColors.accent
+    adColors.accent,
+    intent
   );
 
   adColors.text = layout.textColors.headline;
@@ -385,6 +390,7 @@ export function generateAdSpec(
         provider: 'google',
         name: DEFAULT_IMAGE_MODEL,
       },
+      intent,
       headlineFormula: copy.formula,
       brandMentionMode: copy.brandMention?.mode,
       brandMentionValue: copy.brandMention?.value,
@@ -422,12 +428,16 @@ export function createGenerateAdRouter(): Router {
   const router = Router();
 
   router.post('/api/generate-ad', async (req: Request, res: Response) => {
-    const { prompt, format, templateId } = req.body;
+    const { prompt, format, templateId, intent } = req.body;
 
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
       res.status(400).json({ error: 'Missing or invalid prompt' });
       return;
     }
+
+    const validIntents: AdIntent[] = ['conversion', 'awareness', 'retargeting'];
+    const resolvedIntent: AdIntent | undefined =
+      intent && validIntents.includes(intent) ? intent : undefined;
 
     const normalizedPrompt = prompt.trim();
     const parsed = parsePrompt(normalizedPrompt);
@@ -435,7 +445,7 @@ export function createGenerateAdRouter(): Router {
       ? await fetchWebsiteBrandKit(parsed.websiteUrl)
       : undefined;
     const variantOffset = nextVariantIndex(normalizedPrompt, format, templateId);
-    const adSpec = generateAdSpec(parsed, format, templateId, variantOffset, brandKit);
+    const adSpec = generateAdSpec(parsed, format, templateId, variantOffset, brandKit, resolvedIntent);
     res.json(adSpec);
   });
 

@@ -140,7 +140,7 @@ function nextVariantIndex(prompt, format, templateId) {
     promptVariantMap.set(key, next);
     return next;
 }
-export function generateAdSpec(parsed, format, templateId, variantOffset = 0, brandKit) {
+export function generateAdSpec(parsed, format, templateId, variantOffset = 0, brandKit, intent) {
     let { product, offer, vibe, colors, rawPrompt } = parsed;
     const resolvedFormat = format ?? 'square';
     const isPartingWordPrompt = /partingword|partingword\.com|parting word|end[\s-]?of[\s-]?life messaging/i.test(rawPrompt);
@@ -191,6 +191,7 @@ export function generateAdSpec(parsed, format, templateId, variantOffset = 0, br
         rawPrompt: contextualRawPrompt,
         variantOffset,
         planning: copyPlanning,
+        intent,
     });
     const copyValidation = validateCopy(copy);
     if (!copyValidation.valid) {
@@ -213,7 +214,7 @@ export function generateAdSpec(parsed, format, templateId, variantOffset = 0, br
         adColors.background = '#132B20';
     }
     // 4. Generate fallback layout (client can override with image-aware placement plan)
-    const layout = generateLayout(resolvedFormat, copy.headline, copy.subhead, copy.cta, adColors.background, adColors.accent);
+    const layout = generateLayout(resolvedFormat, copy.headline, copy.subhead, copy.cta, adColors.background, adColors.accent, intent);
     adColors.text = layout.textColors.headline;
     // 5. Build AdSpec
     const isCompassionateContext = /partingword|end[\s-]?of[\s-]?life|legacy|loved ones|grief|bereavement|after i'?m gone/i
@@ -247,6 +248,7 @@ export function generateAdSpec(parsed, format, templateId, variantOffset = 0, br
                 provider: 'google',
                 name: DEFAULT_IMAGE_MODEL,
             },
+            intent,
             headlineFormula: copy.formula,
             brandMentionMode: copy.brandMention?.mode,
             brandMentionValue: copy.brandMention?.value,
@@ -282,18 +284,20 @@ export function generateAdSpec(parsed, format, templateId, variantOffset = 0, br
 export function createGenerateAdRouter() {
     const router = Router();
     router.post('/api/generate-ad', async (req, res) => {
-        const { prompt, format, templateId } = req.body;
+        const { prompt, format, templateId, intent } = req.body;
         if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
             res.status(400).json({ error: 'Missing or invalid prompt' });
             return;
         }
+        const validIntents = ['conversion', 'awareness', 'retargeting'];
+        const resolvedIntent = intent && validIntents.includes(intent) ? intent : undefined;
         const normalizedPrompt = prompt.trim();
         const parsed = parsePrompt(normalizedPrompt);
         const brandKit = parsed.websiteUrl
             ? await fetchWebsiteBrandKit(parsed.websiteUrl)
             : undefined;
         const variantOffset = nextVariantIndex(normalizedPrompt, format, templateId);
-        const adSpec = generateAdSpec(parsed, format, templateId, variantOffset, brandKit);
+        const adSpec = generateAdSpec(parsed, format, templateId, variantOffset, brandKit, resolvedIntent);
         res.json(adSpec);
     });
     return router;

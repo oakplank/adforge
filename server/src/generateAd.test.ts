@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import request from 'supertest';
 import app from './app.js';
 import { parsePrompt, generateAdSpec } from './generateAd.js';
+import type { AdIntent } from './types/textSystem.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -244,5 +245,83 @@ describe('POST /api/generate-ad', () => {
     expect(typeof res.body.metadata.brandKit.contextSummary).toBe('string');
     expect(Array.isArray(res.body.metadata.brandKit.keyPhrases)).toBe(true);
     expect(res.body.metadata.promptPipeline.baseCreativeBrief).toContain('Goal:');
+  });
+
+  it('accepts optional intent field and includes it in metadata', async () => {
+    const res = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'Summer sale 30% off shoes', intent: 'conversion' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.metadata.intent).toBe('conversion');
+  });
+
+  it('works without intent field (backward compatible)', async () => {
+    const res = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'Summer sale 30% off shoes' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.metadata.intent).toBeUndefined();
+  });
+
+  it('ignores invalid intent values', async () => {
+    const res = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'Summer sale 30% off shoes', intent: 'invalid' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.metadata.intent).toBeUndefined();
+  });
+
+  it('produces different copy for retargeting vs conversion intent', async () => {
+    const retargetRes = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'premium headphones deal', intent: 'retargeting' });
+
+    const conversionRes = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'premium headphones deal', intent: 'conversion' });
+
+    expect(retargetRes.status).toBe(200);
+    expect(conversionRes.status).toBe(200);
+
+    // At least one of headline, subhead, or cta should differ
+    const r = retargetRes.body.texts;
+    const c = conversionRes.body.texts;
+    const differs = r.headline !== c.headline || r.subhead !== c.subhead || r.cta !== c.cta;
+    expect(differs).toBe(true);
+  });
+
+  it('accepts all three intent values', async () => {
+    const intents: AdIntent[] = ['conversion', 'awareness', 'retargeting'];
+    for (const intent of intents) {
+      const res = await request(app)
+        .post('/api/generate-ad')
+        .send({ prompt: 'shoes sale', intent });
+
+      expect(res.status).toBe(200);
+      expect(res.body.metadata.intent).toBe(intent);
+    }
+  });
+});
+
+describe('generateAdSpec with intent', () => {
+  it('passes intent through to metadata', () => {
+    const parsed = parsePrompt('Summer sale 30% off shoes');
+    const spec = generateAdSpec(parsed, 'square', undefined, 0, undefined, 'conversion');
+    expect(spec.metadata?.intent).toBe('conversion');
+  });
+
+  it('retargeting and conversion produce different copy', () => {
+    const parsed = parsePrompt('premium headphones deal');
+    const retarget = generateAdSpec(parsed, 'square', undefined, 0, undefined, 'retargeting');
+    const conversion = generateAdSpec(parsed, 'square', undefined, 0, undefined, 'conversion');
+
+    const differs =
+      retarget.texts.headline !== conversion.texts.headline ||
+      retarget.texts.subhead !== conversion.texts.subhead ||
+      retarget.texts.cta !== conversion.texts.cta;
+    expect(differs).toBe(true);
   });
 });

@@ -334,6 +334,13 @@ function offerToken(offer) {
     return offer.trim();
 }
 function formulaCandidates(input, objective) {
+    // Intent-based formula selection takes priority
+    if (input.intent === 'retargeting')
+        return ['proof', 'benefit', 'question'];
+    if (input.intent === 'conversion')
+        return ['urgency', 'number', 'benefit'];
+    if (input.intent === 'awareness')
+        return ['benefit', 'curiosity', 'question'];
     const category = input.category.toLowerCase();
     const vibe = input.vibe.toLowerCase();
     if (objective === 'offer')
@@ -453,7 +460,21 @@ function generateSubhead(formula, input, seed) {
     };
     return pickVariant(formulaLines[formula], seed + 7);
 }
+export const RETARGETING_CTA_CANDIDATES = [
+    'Come Back',
+    'Still Interested?',
+    'Complete Order',
+    'Finish Checkout',
+    'Return & Save',
+];
 function ctaCandidates(input, objective) {
+    // Intent-based CTA selection
+    if (input.intent === 'retargeting')
+        return RETARGETING_CTA_CANDIDATES;
+    if (input.intent === 'conversion')
+        return ['Buy Now', 'Get Started', 'Claim Offer', 'Save Today'];
+    if (input.intent === 'awareness')
+        return ['Learn More', 'Discover More', 'See Why', 'Explore'];
     const category = input.category.toLowerCase();
     if (objective === 'offer') {
         if (category === 'travel')
