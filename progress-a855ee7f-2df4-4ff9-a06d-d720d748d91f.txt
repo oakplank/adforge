@@ -69,3 +69,13 @@
 - Updated layers.test.ts with 12 tests covering presets, defaults, hierarchy
 - All 231 client tests pass, typecheck passes
 ---
+
+## 2026-02-16 22:28 - US-011: Update TypographyControls to show token role selector and constrained sizing
+- Added token role dropdown (headline/subhead/body/custom) to TypographyControls.tsx
+- Role selection auto-applies preset fontFamily, fontWeight, and clamps fontSize to min/max
+- Custom role keeps unconstrained sizing (1-500)
+- Font size input min/max attributes dynamically set based on selected role
+- Added 8 new tests: role dropdown rendering, preset application, size clamping (too large/too small), constrained min/max attributes, custom unconstrained, role clearing
+- All 240 client tests pass, typecheck passes
+- **Learnings:** Client vitest has globals enabled (no explicit imports needed unlike server)
+---
