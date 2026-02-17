@@ -60,3 +60,12 @@
 - All 221 client tests pass, typecheck passes
 - **Learnings:** Client vitest has globals: true, so import from vitest is optional but explicit is fine
 ---
+
+## 2026-02-16 21:33 - US-010: Add brand token styles to client-side layer types
+- Added TokenRole type, BrandTextPreset interface, BRAND_TEXT_PRESETS constant to client/src/types/layers.ts
+- Extended TextStyle with optional tokenRole field
+- DEFAULT_TEXT_STYLE now derives from BRAND_TEXT_PRESETS.headline
+- DEFAULT_CTA_STYLE padding derives from BRAND_TEXT_PRESETS.cta
+- Updated layers.test.ts with 12 tests covering presets, defaults, hierarchy
+- All 231 client tests pass, typecheck passes
+---
