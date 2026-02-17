@@ -198,13 +198,37 @@ export class NanoBananaClient {
             clearTimeout(timeout);
         }
     }
+    /**
+     * Truncate a prompt to approximately maxWords words, preserving sentence boundaries
+     * where possible. Strips metadata-like lines (audience:, format:, brand:, etc.).
+     */
+    truncatePrompt(text, maxWords = 60) {
+        // Strip lines that look like pipeline metadata
+        const stripped = text
+            .split('\n')
+            .filter((line) => !/^\s*(audience|format|brand|platform|context|config|metadata|specs?|dimensions?)\s*[:=]/i.test(line))
+            .join(' ');
+        const cleaned = normalizeWhitespace(stripped);
+        const words = cleaned.split(' ');
+        if (words.length <= maxWords)
+            return cleaned;
+        // Try to end on a sentence boundary within the budget
+        const truncated = words.slice(0, maxWords).join(' ');
+        const sentenceEnd = truncated.lastIndexOf('.');
+        if (sentenceEnd > truncated.length * 0.5) {
+            return truncated.slice(0, sentenceEnd + 1);
+        }
+        return truncated + '…';
+    }
     async generateImage(prompt, width, height, enhancedPrompt, systemPrompt, model) {
         if (!this.apiKey) {
             throw new Error('NANO_BANANA_API_KEY is not configured');
         }
         const selectedModel = this.sanitizeModel(model);
-        const finalPrompt = enhancedPrompt?.trim() ||
+        const rawPrompt = enhancedPrompt?.trim() ||
             `Generate an image: ${prompt}. The image should be ${width}x${height} pixels, premium quality, professional advertising style.`;
+        // Truncate to ~60 words to avoid Gemini 3 Pro hanging on long prompts
+        const finalPrompt = this.truncatePrompt(rawPrompt, 60);
         const payload = {
             contents: [
                 {
@@ -217,7 +241,7 @@ export class NanoBananaClient {
             payload.systemInstruction = { parts: [{ text: systemPrompt.trim() }] };
         }
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 120_000);
+        const timeout = setTimeout(() => controller.abort(), 180_000);
         try {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${this.apiKey}`;
             const response = await fetch(url, {

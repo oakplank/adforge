@@ -231,6 +231,30 @@ export class NanoBananaClient {
     }
   }
 
+  /**
+   * Truncate a prompt to approximately maxWords words, preserving sentence boundaries
+   * where possible. Strips metadata-like lines (audience:, format:, brand:, etc.).
+   */
+  private truncatePrompt(text: string, maxWords: number = 60): string {
+    // Strip lines that look like pipeline metadata
+    const stripped = text
+      .split('\n')
+      .filter((line) => !/^\s*(audience|format|brand|platform|context|config|metadata|specs?|dimensions?)\s*[:=]/i.test(line))
+      .join(' ');
+
+    const cleaned = normalizeWhitespace(stripped);
+    const words = cleaned.split(' ');
+    if (words.length <= maxWords) return cleaned;
+
+    // Try to end on a sentence boundary within the budget
+    const truncated = words.slice(0, maxWords).join(' ');
+    const sentenceEnd = truncated.lastIndexOf('.');
+    if (sentenceEnd > truncated.length * 0.5) {
+      return truncated.slice(0, sentenceEnd + 1);
+    }
+    return truncated + '…';
+  }
+
   async generateImage(
     prompt: string,
     width: number,
@@ -244,9 +268,12 @@ export class NanoBananaClient {
     }
 
     const selectedModel = this.sanitizeModel(model);
-    const finalPrompt =
+    const rawPrompt =
       enhancedPrompt?.trim() ||
       `Generate an image: ${prompt}. The image should be ${width}x${height} pixels, premium quality, professional advertising style.`;
+
+    // Truncate to ~60 words to avoid Gemini 3 Pro hanging on long prompts
+    const finalPrompt = this.truncatePrompt(rawPrompt, 60);
 
     const payload: Record<string, unknown> = {
       contents: [
@@ -262,7 +289,7 @@ export class NanoBananaClient {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120_000);
+    const timeout = setTimeout(() => controller.abort(), 180_000);
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${this.apiKey}`;
       const response = await fetch(url, {
