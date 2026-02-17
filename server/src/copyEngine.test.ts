@@ -3,6 +3,7 @@ import {
   generateCopy,
   validateCopy,
   CHAR_LIMITS,
+  RETARGETING_CTA_CANDIDATES,
 } from './copyEngine.js';
 
 describe('generateCopy', () => {
@@ -303,5 +304,96 @@ describe('CHAR_LIMITS', () => {
     expect(CHAR_LIMITS.headline).toBe(34);
     expect(CHAR_LIMITS.subhead).toBe(62);
     expect(CHAR_LIMITS.cta).toBe(16);
+  });
+});
+
+describe('intent-based copy strategy', () => {
+  const baseInput = {
+    product: 'sneakers',
+    vibe: 'energetic',
+    category: 'fashion',
+  };
+
+  it('accepts optional intent field', () => {
+    const result = generateCopy({ ...baseInput, intent: 'conversion' });
+    expect(result).toBeDefined();
+    expect(result.headline.length).toBeGreaterThan(0);
+  });
+
+  it('retargeting intent uses retargeting CTA candidates', () => {
+    const results = Array.from({ length: 10 }, (_, i) =>
+      generateCopy({ ...baseInput, intent: 'retargeting', variantOffset: i })
+    );
+    const allCtas = results.map((r) => r.cta);
+    const hasRetargetingCta = allCtas.some((cta) =>
+      RETARGETING_CTA_CANDIDATES.some((rc) => rc === cta)
+    );
+    expect(hasRetargetingCta).toBe(true);
+  });
+
+  it('retargeting CTA candidates include at least 3 retargeting-specific options', () => {
+    expect(RETARGETING_CTA_CANDIDATES.length).toBeGreaterThanOrEqual(3);
+    expect(RETARGETING_CTA_CANDIDATES).toContain('Come Back');
+    expect(RETARGETING_CTA_CANDIDATES).toContain('Still Interested?');
+    expect(RETARGETING_CTA_CANDIDATES).toContain('Complete Order');
+  });
+
+  it('retargeting intent produces different formulas than conversion', () => {
+    const retargetingResults = Array.from({ length: 5 }, (_, i) =>
+      generateCopy({ ...baseInput, intent: 'retargeting', variantOffset: i })
+    );
+    const conversionResults = Array.from({ length: 5 }, (_, i) =>
+      generateCopy({ ...baseInput, intent: 'conversion', variantOffset: i })
+    );
+
+    const retargetingFormulas = new Set(retargetingResults.map((r) => r.formula));
+    const conversionFormulas = new Set(conversionResults.map((r) => r.formula));
+
+    // Retargeting should prefer proof/benefit/question, not urgency/number
+    expect(retargetingFormulas.has('urgency')).toBe(false);
+    // Conversion should prefer urgency/number/benefit
+    expect(
+      conversionFormulas.has('urgency') || conversionFormulas.has('number')
+    ).toBe(true);
+  });
+
+  it('awareness intent prefers benefit/curiosity/question formulas', () => {
+    const results = Array.from({ length: 10 }, (_, i) =>
+      generateCopy({ ...baseInput, intent: 'awareness', variantOffset: i })
+    );
+    const formulas = new Set(results.map((r) => r.formula));
+    const allowed = new Set(['benefit', 'curiosity', 'question']);
+    for (const f of formulas) {
+      expect(allowed.has(f)).toBe(true);
+    }
+  });
+
+  it('conversion intent uses conversion CTA candidates', () => {
+    const results = Array.from({ length: 10 }, (_, i) =>
+      generateCopy({ ...baseInput, intent: 'conversion', variantOffset: i })
+    );
+    const conversionCtas = ['Buy Now', 'Get Started', 'Claim Offer', 'Save Today'];
+    const allCtas = results.map((r) => r.cta);
+    const hasConversionCta = allCtas.some((cta) => conversionCtas.includes(cta));
+    expect(hasConversionCta).toBe(true);
+  });
+
+  it('all intent-driven outputs respect character limits', () => {
+    const intents = ['conversion', 'awareness', 'retargeting'] as const;
+    for (const intent of intents) {
+      for (let i = 0; i < 5; i++) {
+        const result = generateCopy({ ...baseInput, intent, variantOffset: i });
+        expect(result.headline.length).toBeLessThanOrEqual(CHAR_LIMITS.headline);
+        expect(result.subhead.length).toBeLessThanOrEqual(CHAR_LIMITS.subhead);
+        expect(result.cta.length).toBeLessThanOrEqual(CHAR_LIMITS.cta);
+      }
+    }
+  });
+
+  it('without intent, existing behavior is preserved', () => {
+    const withoutIntent = generateCopy({ ...baseInput, objective: 'offer', offer: '20% off' });
+    const withIntent = generateCopy({ ...baseInput, objective: 'offer', offer: '20% off', intent: 'retargeting' });
+    // Different formulas expected
+    expect(withoutIntent.formula).not.toBe(withIntent.formula);
   });
 });

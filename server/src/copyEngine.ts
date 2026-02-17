@@ -1,5 +1,7 @@
 // Copy Engine - deterministic copy strategy with stronger CTA diversity.
 
+import type { AdIntent } from './types/textSystem.js';
+
 export type HeadlineFormula =
   | 'urgency'
   | 'benefit'
@@ -31,6 +33,7 @@ export interface CopyInput {
   rawPrompt?: string;
   variantOffset?: number;
   planning?: CopyPlanningLayer;
+  intent?: AdIntent;
 }
 
 export interface CopyOutput {
@@ -420,6 +423,11 @@ function offerToken(offer?: string): string {
 }
 
 function formulaCandidates(input: CopyInput, objective: Objective): HeadlineFormula[] {
+  // Intent-based formula selection takes priority
+  if (input.intent === 'retargeting') return ['proof', 'benefit', 'question'];
+  if (input.intent === 'conversion') return ['urgency', 'number', 'benefit'];
+  if (input.intent === 'awareness') return ['benefit', 'curiosity', 'question'];
+
   const category = input.category.toLowerCase();
   const vibe = input.vibe.toLowerCase();
 
@@ -566,7 +574,20 @@ function generateSubhead(formula: HeadlineFormula, input: CopyInput, seed: numbe
   return pickVariant(formulaLines[formula], seed + 7);
 }
 
+export const RETARGETING_CTA_CANDIDATES = [
+  'Come Back',
+  'Still Interested?',
+  'Complete Order',
+  'Finish Checkout',
+  'Return & Save',
+];
+
 function ctaCandidates(input: CopyInput, objective: Objective): string[] {
+  // Intent-based CTA selection
+  if (input.intent === 'retargeting') return RETARGETING_CTA_CANDIDATES;
+  if (input.intent === 'conversion') return ['Buy Now', 'Get Started', 'Claim Offer', 'Save Today'];
+  if (input.intent === 'awareness') return ['Learn More', 'Discover More', 'See Why', 'Explore'];
+
   const category = input.category.toLowerCase();
 
   if (objective === 'offer') {
