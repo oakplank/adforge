@@ -22,6 +22,14 @@ function checkRateLimit(ip: string): boolean {
   if (recent.length >= RATE_LIMIT_MAX) return false;
   recent.push(now);
   rateLimitMap.set(ip, recent);
+  // Periodic cleanup: drop stale entries every 100 checks
+  if (rateLimitMap.size > 100) {
+    for (const [key, ts] of rateLimitMap) {
+      if (ts.every((t) => now - t > RATE_LIMIT_WINDOW_MS)) {
+        rateLimitMap.delete(key);
+      }
+    }
+  }
   return true;
 }
 

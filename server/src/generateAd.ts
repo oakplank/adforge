@@ -435,6 +435,11 @@ export function createGenerateAdRouter(): Router {
       return;
     }
 
+    if (prompt.length > 2000) {
+      res.status(400).json({ error: 'Prompt too long (max 2000 characters)' });
+      return;
+    }
+
     const validIntents: AdIntent[] = ['conversion', 'awareness', 'retargeting'];
     const resolvedIntent: AdIntent | undefined =
       intent && validIntents.includes(intent) ? intent : undefined;

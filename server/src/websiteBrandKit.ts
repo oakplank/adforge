@@ -316,11 +316,43 @@ export function extractWebsiteSignal(rawPrompt: string): string | undefined {
   return undefined;
 }
 
+const BLOCKED_HOSTNAME_PATTERNS = [
+  /^localhost$/i,
+  /^127\./,
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^169\.254\./,
+  /^0\./,
+  /^\[::1\]$/,
+  /^metadata\.google\.internal$/i,
+];
+
+function isBlockedHost(hostname: string): boolean {
+  return BLOCKED_HOSTNAME_PATTERNS.some((p) => p.test(hostname));
+}
+
 async function fetchTextWithTimeout(url: string, timeoutMs = 3500): Promise<string> {
+  const parsed = new URL(url);
+  if (isBlockedHost(parsed.hostname)) {
+    throw new Error('Blocked host');
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: controller.signal });
+    const res = await fetch(url, { signal: controller.signal, redirect: 'manual' });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (location) {
+        const redirected = new URL(location, url);
+        if (isBlockedHost(redirected.hostname)) {
+          throw new Error('Blocked redirect host');
+        }
+        const res2 = await fetch(redirected.toString(), { signal: controller.signal });
+        if (!res2.ok) throw new Error(`failed with status ${res2.status}`);
+        return await res2.text();
+      }
+    }
     if (!res.ok) {
       throw new Error(`failed with status ${res.status}`);
     }
