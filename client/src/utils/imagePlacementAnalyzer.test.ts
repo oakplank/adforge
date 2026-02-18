@@ -30,6 +30,26 @@ function noisyTopImage(width: number, height: number) {
   return { data, width, height };
 }
 
+function centerPreferredImage(width: number, height: number) {
+  const data = new Uint8ClampedArray(width * height * 4);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const idx = (y * width + x) * 4;
+      const inTopBand = y < height * 0.42;
+      const inCenterX = x > width * 0.25 && x < width * 0.75;
+      const noisy = inTopBand && !inCenterX;
+      const value = noisy ? (x * 31 + y * 17) % 255 : 46;
+      data[idx] = value;
+      data[idx + 1] = value;
+      data[idx + 2] = value;
+      data[idx + 3] = 255;
+    }
+  }
+
+  return { data, width, height };
+}
+
 describe('buildPlacementPlanFromImageData', () => {
   it('chooses dark text on very light imagery', () => {
     const image = solidImage(220, 220, 245, 245, 245);
@@ -54,5 +74,19 @@ describe('buildPlacementPlanFromImageData', () => {
     expect(plan.cta.y).toBeGreaterThan(0.7);
     expect(plan.confidence).toBeGreaterThan(0);
     expect(plan.rationale.length).toBeGreaterThan(0);
+  });
+
+  it('avoids centered headline placement when avoidCenter hint is true', () => {
+    const image = centerPreferredImage(320, 320);
+    const centeredPlan = buildPlacementPlanFromImageData(image, { formatId: 'square' });
+    const avoidedPlan = buildPlacementPlanFromImageData(image, {
+      formatId: 'square',
+      avoidCenter: true,
+      preferredAlignment: 'left',
+    });
+
+    expect(centeredPlan.headline.align).toBe('center');
+    expect(avoidedPlan.headline.align).toBe('left');
+    expect(avoidedPlan.subhead.y).toBeGreaterThan(avoidedPlan.headline.y + avoidedPlan.headline.height);
   });
 });

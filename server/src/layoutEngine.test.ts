@@ -11,6 +11,7 @@ import {
   SAFE_ZONES,
   FONT_SIZES,
 } from './layoutEngine.js';
+import type { AdIntent } from './types/textSystem.js';
 
 describe('calculateContrastRatio', () => {
   it('calculates maximum contrast for black on white', () => {
@@ -136,10 +137,11 @@ describe('generateLayout', () => {
   it('calculates appropriate font sizes', () => {
     const layout = generateLayout('square', 'Short', 'Medium subhead', 'CTA', '#121212', '#FF6B00');
 
-    expect(layout.headline.fontSize).toBeGreaterThanOrEqual(FONT_SIZES.headline.min);
-    expect(layout.headline.fontSize).toBeLessThanOrEqual(FONT_SIZES.headline.max);
-    expect(layout.subhead.fontSize).toBeGreaterThanOrEqual(FONT_SIZES.subhead.min);
-    expect(layout.subhead.fontSize).toBeLessThanOrEqual(FONT_SIZES.subhead.max);
+    // Font sizes should be within the new TYPOGRAPHY_SCALE ranges
+    expect(layout.headline.fontSize).toBeGreaterThanOrEqual(24);
+    expect(layout.headline.fontSize).toBeLessThanOrEqual(72);
+    expect(layout.subhead.fontSize).toBeGreaterThanOrEqual(18);
+    expect(layout.subhead.fontSize).toBeLessThanOrEqual(48);
   });
 
   it('provides accessible text colors', () => {
@@ -238,5 +240,86 @@ describe('SAFE_ZONES', () => {
 describe('WCAG_AA_RATIO', () => {
   it('is set to 4.5', () => {
     expect(WCAG_AA_RATIO).toBe(4.5);
+  });
+});
+
+describe('generateLayout with intent parameter', () => {
+  const intents: AdIntent[] = ['conversion', 'awareness', 'retargeting'];
+
+  it('accepts optional intent parameter without breaking', () => {
+    const layoutWithout = generateLayout('square', 'Test', 'Sub', 'CTA', '#121212', '#FF6B00');
+    const layoutWith = generateLayout('square', 'Test', 'Sub', 'CTA', '#121212', '#FF6B00', 'conversion');
+    
+    expect(layoutWithout.format).toBe('square');
+    expect(layoutWith.format).toBe('square');
+    expect(layoutWith.width).toBe(1080);
+    expect(layoutWith.height).toBe(1080);
+  });
+
+  it('generates valid layout for each intent', () => {
+    for (const intent of intents) {
+      const layout = generateLayout('square', 'Headline', 'Subhead', 'Shop Now', '#121212', '#FF6B00', intent);
+      expect(layout.headline).toBeDefined();
+      expect(layout.subhead).toBeDefined();
+      expect(layout.cta).toBeDefined();
+      expect(layout.headline.fontSize).toBeGreaterThan(0);
+      expect(layout.subhead.fontSize).toBeGreaterThan(0);
+      expect(layout.cta.fontSize).toBeGreaterThan(0);
+    }
+  });
+
+  it('conversion intent has larger CTA than awareness', () => {
+    const conversion = generateLayout('square', 'Buy Now', 'Great deal', 'Shop', '#121212', '#FF6B00', 'conversion');
+    const awareness = generateLayout('square', 'Buy Now', 'Great deal', 'Shop', '#121212', '#FF6B00', 'awareness');
+    
+    expect(conversion.cta.fontSize).toBeGreaterThan(awareness.cta.fontSize);
+  });
+
+  it('awareness intent has larger headline than conversion', () => {
+    const conversion = generateLayout('square', 'Headline', 'Sub', 'CTA', '#121212', '#FF6B00', 'conversion');
+    const awareness = generateLayout('square', 'Headline', 'Sub', 'CTA', '#121212', '#FF6B00', 'awareness');
+    
+    expect(awareness.headline.fontSize).toBeGreaterThan(conversion.headline.fontSize);
+  });
+
+  it('works with all format types and intents', () => {
+    const formats = ['square', 'portrait', 'story'];
+    for (const format of formats) {
+      for (const intent of intents) {
+        const layout = generateLayout(format, 'H', 'S', 'C', '#121212', '#FF6B00', intent);
+        expect(layout.format).toBe(format);
+        expect(layout.headline.fontSize).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('maintains backward compatibility - no intent gives same structure', () => {
+    const layout = generateLayout('square', 'Test', 'Sub', 'CTA', '#121212', '#FF6B00');
+    
+    // All original fields must exist
+    expect(layout).toHaveProperty('format');
+    expect(layout).toHaveProperty('width');
+    expect(layout).toHaveProperty('height');
+    expect(layout).toHaveProperty('headline');
+    expect(layout).toHaveProperty('subhead');
+    expect(layout).toHaveProperty('cta');
+    expect(layout).toHaveProperty('logoPosition');
+    expect(layout).toHaveProperty('textColors');
+    expect(layout).toHaveProperty('contrastRatios');
+    expect(layout).toHaveProperty('readingPattern');
+  });
+});
+
+describe('deprecated constants still exported', () => {
+  it('FONT_SIZES still available for backward compatibility', () => {
+    expect(FONT_SIZES.headline).toBeDefined();
+    expect(FONT_SIZES.subhead).toBeDefined();
+    expect(FONT_SIZES.cta).toBeDefined();
+  });
+
+  it('SAFE_ZONES still available for backward compatibility', () => {
+    expect(SAFE_ZONES.square).toBeDefined();
+    expect(SAFE_ZONES.portrait).toBeDefined();
+    expect(SAFE_ZONES.story).toBeDefined();
   });
 });

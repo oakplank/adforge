@@ -1,7 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import request from 'supertest';
 import app from './app.js';
 import { parsePrompt, generateAdSpec } from './generateAd.js';
+import type { AdIntent } from './types/textSystem.js';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('parsePrompt', () => {
   it('extracts offer percentage', () => {
@@ -50,6 +55,16 @@ describe('parsePrompt', () => {
     const input = 'Test prompt with special chars !@#$';
     const result = parsePrompt(input);
     expect(result.rawPrompt).toBe(input);
+  });
+
+  it('detects explicit website signal when prefixed with @', () => {
+    const result = parsePrompt('launch campaign for @clearpathathletics.com');
+    expect(result.websiteUrl).toBe('https://clearpathathletics.com');
+  });
+
+  it('detects bare domain website signal', () => {
+    const result = parsePrompt('launch campaign for clearpathathletics.com spring showcase');
+    expect(result.websiteUrl).toBe('https://clearpathathletics.com');
   });
 });
 
@@ -120,6 +135,14 @@ describe('generateAdSpec', () => {
     expect(spec.colors.accent).toBe('#2D6A4F');
     expect(spec.templateId).toBe('minimal');
   });
+
+  it('returns brand mention metadata when prompt contains website/brand cues', () => {
+    const parsed = parsePrompt('ClearPathAthletics.com spring showcase registration');
+    const spec = generateAdSpec(parsed, 'portrait');
+
+    expect(spec.metadata?.brandMentionMode).toBeTruthy();
+    expect(['none', 'cta', 'subhead', 'headline']).toContain(spec.metadata?.brandMentionMode);
+  });
 });
 
 describe('POST /api/generate-ad', () => {
@@ -175,6 +198,8 @@ describe('POST /api/generate-ad', () => {
     expect(res.body.metadata.placementHints).toBeDefined();
     expect(res.body.metadata.agenticPlan).toBeDefined();
     expect(res.body.metadata.promptPipeline.systemPrompt).toBeTruthy();
+    expect(res.body.metadata.copyPlan).toBeDefined();
+    expect(typeof res.body.metadata.copyPlan.strategy).toBe('string');
   });
 
   it('rotates copy variant index for repeated prompt requests', async () => {
@@ -187,5 +212,116 @@ describe('POST /api/generate-ad', () => {
     expect(typeof first.body.metadata.copyVariantIndex).toBe('number');
     expect(typeof second.body.metadata.copyVariantIndex).toBe('number');
     expect(second.body.metadata.copyVariantIndex).toBe((first.body.metadata.copyVariantIndex + 1) % 997);
+  });
+
+  it('attaches website brand kit metadata when @domain trigger is used', async () => {
+    const mockHtml = `
+      <html>
+        <head>
+          <title>ClearPath Athletics</title>
+          <link rel="icon" href="/logos/logo-dark.png" />
+        </head>
+        <body style="background:#071631;color:#63A8FF">
+          <div style="color:#B3D6F6"></div>
+        </body>
+      </html>
+    `;
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => mockHtml,
+    } as unknown as Response);
+
+    const res = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'create launch ad for @clearpathathletics.com, energetic vibe' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.metadata.brandKit).toBeTruthy();
+    expect(res.body.metadata.brandKit.domain).toBe('clearpathathletics.com');
+    expect(res.body.metadata.brandKit.brandName).toContain('ClearPath');
+    expect(Array.isArray(res.body.metadata.brandKit.palette)).toBe(true);
+    expect(typeof res.body.metadata.brandKit.contextSummary).toBe('string');
+    expect(Array.isArray(res.body.metadata.brandKit.keyPhrases)).toBe(true);
+    expect(res.body.metadata.promptPipeline.baseCreativeBrief).toContain('Goal:');
+  });
+
+  it('accepts optional intent field and includes it in metadata', async () => {
+    const res = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'Summer sale 30% off shoes', intent: 'conversion' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.metadata.intent).toBe('conversion');
+  });
+
+  it('works without intent field (backward compatible)', async () => {
+    const res = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'Summer sale 30% off shoes' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.metadata.intent).toBeUndefined();
+  });
+
+  it('ignores invalid intent values', async () => {
+    const res = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'Summer sale 30% off shoes', intent: 'invalid' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.metadata.intent).toBeUndefined();
+  });
+
+  it('produces different copy for retargeting vs conversion intent', async () => {
+    const retargetRes = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'premium headphones deal', intent: 'retargeting' });
+
+    const conversionRes = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'premium headphones deal', intent: 'conversion' });
+
+    expect(retargetRes.status).toBe(200);
+    expect(conversionRes.status).toBe(200);
+
+    // At least one of headline, subhead, or cta should differ
+    const r = retargetRes.body.texts;
+    const c = conversionRes.body.texts;
+    const differs = r.headline !== c.headline || r.subhead !== c.subhead || r.cta !== c.cta;
+    expect(differs).toBe(true);
+  });
+
+  it('accepts all three intent values', async () => {
+    const intents: AdIntent[] = ['conversion', 'awareness', 'retargeting'];
+    for (const intent of intents) {
+      const res = await request(app)
+        .post('/api/generate-ad')
+        .send({ prompt: 'shoes sale', intent });
+
+      expect(res.status).toBe(200);
+      expect(res.body.metadata.intent).toBe(intent);
+    }
+  });
+});
+
+describe('generateAdSpec with intent', () => {
+  it('passes intent through to metadata', () => {
+    const parsed = parsePrompt('Summer sale 30% off shoes');
+    const spec = generateAdSpec(parsed, 'square', undefined, 0, undefined, 'conversion');
+    expect(spec.metadata?.intent).toBe('conversion');
+  });
+
+  it('retargeting and conversion produce different copy', () => {
+    const parsed = parsePrompt('premium headphones deal');
+    const retarget = generateAdSpec(parsed, 'square', undefined, 0, undefined, 'retargeting');
+    const conversion = generateAdSpec(parsed, 'square', undefined, 0, undefined, 'conversion');
+
+    const differs =
+      retarget.texts.headline !== conversion.texts.headline ||
+      retarget.texts.subhead !== conversion.texts.subhead ||
+      retarget.texts.cta !== conversion.texts.cta;
+    expect(differs).toBe(true);
   });
 });

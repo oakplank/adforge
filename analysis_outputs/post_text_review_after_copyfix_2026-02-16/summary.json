@@ -1,0 +1,67 @@
+[
+  {
+    "id": "01-core-launch",
+    "prompt": "PartingWord.com launch ad for end-of-life messaging platform, compassionate premium tone for adults preparing messages for loved ones, dark green and cream beige.",
+    "screenshotFull": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_after_copyfix_2026-02-16/01-core-launch-full.png",
+    "screenshotCanvas": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_after_copyfix_2026-02-16/01-core-launch-canvas.png",
+    "text": {
+      "headline": "Messages for the People You Love",
+      "subhead": "Capture guidance, love, and practical notes for the people who matter m…",
+      "cta": "See How It Works"
+    },
+    "templateId": "minimal",
+    "objective": "launch"
+  },
+  {
+    "id": "02-caregiver-angle",
+    "prompt": "PartingWord for caregivers and family coordinators, focus on guidance notes and practical care instructions with emotional warmth, Instagram portrait ad.",
+    "screenshotFull": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_after_copyfix_2026-02-16/02-caregiver-angle-full.png",
+    "screenshotCanvas": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_after_copyfix_2026-02-16/02-caregiver-angle-canvas.png",
+    "text": {
+      "headline": "Messages for the People You Love",
+      "subhead": "Write future messages your loved ones can receive at the right time.",
+      "cta": "Explore PartingWo…"
+    },
+    "templateId": "minimal",
+    "objective": "awareness"
+  },
+  {
+    "id": "03-younger-family-angle",
+    "prompt": "PartingWord for younger parents planning responsibly, reassuring legacy message creation without fear-based language, modern calm style.",
+    "screenshotFull": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_after_copyfix_2026-02-16/03-younger-family-angle-full.png",
+    "screenshotCanvas": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_after_copyfix_2026-02-16/03-younger-family-angle-canvas.png",
+    "text": {
+      "headline": "Messages for the People You Love",
+      "subhead": "Write future messages your loved ones can receive at the right time.",
+      "cta": "Explore PartingWo…"
+    },
+    "templateId": "minimal",
+    "objective": "awareness"
+  },
+  {
+    "id": "04-faith-and-memory-angle",
+    "prompt": "PartingWord legacy messages for families preserving values, memories, and blessings, dignified and human, not salesy.",
+    "screenshotFull": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_after_copyfix_2026-02-16/04-faith-and-memory-angle-full.png",
+    "screenshotCanvas": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_after_copyfix_2026-02-16/04-faith-and-memory-angle-canvas.png",
+    "text": {
+      "headline": "Your Voice, Preserved With Care",
+      "subhead": "Prepare heartfelt messages now so loved ones have your words later.",
+      "cta": "Start a Message"
+    },
+    "templateId": "minimal",
+    "objective": "offer"
+  },
+  {
+    "id": "05-voice-focus-angle",
+    "prompt": "PartingWord voice and written message preservation campaign, emotionally specific but clear, no generic CTA marketing jargon.",
+    "screenshotFull": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_after_copyfix_2026-02-16/05-voice-focus-angle-full.png",
+    "screenshotCanvas": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_after_copyfix_2026-02-16/05-voice-focus-angle-canvas.png",
+    "text": {
+      "headline": "When Words Matter Most",
+      "subhead": "Turn meaningful thoughts into lasting messages your family can keep.",
+      "cta": "Start a Message"
+    },
+    "templateId": "minimal",
+    "objective": "awareness"
+  }
+]

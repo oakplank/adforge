@@ -12,6 +12,12 @@ import {
   generateLayout,
   type LayoutOutput,
 } from './layoutEngine.js';
+import type { AdIntent } from './types/textSystem.js';
+import {
+  extractWebsiteSignal,
+  fetchWebsiteBrandKit,
+  type WebsiteBrandKit,
+} from './websiteBrandKit.js';
 
 const DEFAULT_IMAGE_MODEL = process.env.NANO_BANANA_MODEL || 'gemini-3-pro-image-preview';
 const promptVariantMap = new Map<string, number>();
@@ -73,6 +79,21 @@ export interface AdSpec {
       name: string;
     };
     headlineFormula: string;
+    brandMentionMode?: 'none' | 'cta' | 'subhead' | 'headline';
+    brandMentionValue?: string;
+    brandKit?: {
+      sourceUrl: string;
+      domain: string;
+      brandName: string;
+      logoUrl?: string;
+      palette: string[];
+      contextSummary: string;
+      keyPhrases: string[];
+      businessType?: string;
+      targetAudience?: string;
+      offerings?: string[];
+    };
+    intent?: AdIntent;
     contrastRatios: {
       headline: number;
       subhead: number;
@@ -81,6 +102,11 @@ export interface AdSpec {
     formatConfig: FormatConfig;
     copyVariantIndex: number;
     textTreatmentHintId: string;
+    copyPlan?: {
+      planningDriven: boolean;
+      rationale: string[];
+      strategy: string;
+    };
   };
 }
 
@@ -90,10 +116,12 @@ interface ParsedPrompt {
   vibe: string;
   colors: string[];
   rawPrompt: string;
+  websiteUrl?: string;
 }
 
 export function parsePrompt(prompt: string): ParsedPrompt {
   const lower = prompt.toLowerCase();
+  const websiteUrl = extractWebsiteSignal(prompt);
 
   // Extract offer
   const offerPatterns = [
@@ -131,27 +159,95 @@ export function parsePrompt(prompt: string): ParsedPrompt {
   }
 
   // Extract product (focus on first clause, then strip intent/style noise)
-  let product = prompt.split(/[,.]/)[0] || prompt;
+  let product = prompt.split(/[,;]|(?:\.\s+)/)[0] || prompt;
+  product = product.replace(/\b(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/[^\s]*)?/gi, ' ');
+  product = product.replace(/@/g, ' ');
   if (offer) product = product.replace(new RegExp(offer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '');
   product = product.replace(/\b(for|targeting)\s+[a-z0-9][a-z0-9\s-]{2,45}$/i, '');
   for (const v of vibeKeywords) product = product.replace(new RegExp(`\\b${v}\\b`, 'gi'), '');
   for (const c of Object.keys(COLOR_NAME_MAP)) product = product.replace(new RegExp(`\\b${c}\\b`, 'gi'), '');
   product = product.replace(
-    /\b(and|the|a|an|for|with|vibe|sale|discount|offer|new|launch|introducing|style|look|now|today)\b/gi,
+    /\b(and|the|a|an|for|with|ad|vibe|sale|discount|offer|new|launch|introducing|style|look|now|today)\b/gi,
     ''
   );
   product = product.replace(/[,]+/g, ' ').replace(/\s+/g, ' ').trim();
 
-  return { product: product || 'product', offer, vibe, colors, rawPrompt: prompt };
+  return { product: product || 'product', offer, vibe, colors, rawPrompt: prompt, websiteUrl };
 }
 
-function resolveTextTreatmentHint(objective: Objective, variantOffset: number): string {
-  const seed = variantOffset % TEXT_TREATMENT_HINTS.length;
-  const hint = TEXT_TREATMENT_HINTS[seed];
-  if (objective === 'offer' && hint === 'quiet-minimal') {
-    return 'campaign-outline';
+function stableHash(text: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
   }
-  return hint;
+  return Math.abs(hash >>> 0);
+}
+
+function resolveTextTreatmentHint(input: {
+  objective: Objective;
+  vibe: string;
+  variantOffset: number;
+  promptPipeline: PromptPipeline;
+  placementHints: PlacementPlanHints;
+  isCompassionateContext: boolean;
+  headlineFormula: string;
+}): string {
+  const {
+    objective,
+    vibe,
+    variantOffset,
+    promptPipeline,
+    placementHints,
+    isCompassionateContext,
+    headlineFormula,
+  } = input;
+  const tone = vibe.toLowerCase();
+  const humanPresence = promptPipeline.thoughtSession.humanPresence;
+
+  let candidates: string[];
+  if (isCompassionateContext) {
+    candidates =
+      objective === 'offer'
+        ? ['campaign-outline', 'warm-label', 'editorial-soft']
+        : objective === 'launch'
+          ? ['serif-story', 'warm-label', 'editorial-soft']
+          : ['quiet-minimal', 'serif-story', 'warm-label'];
+  } else if (objective === 'offer') {
+    candidates = ['campaign-outline', 'editorial-soft', 'warm-label'];
+  } else if (objective === 'launch') {
+    candidates = ['editorial-soft', 'serif-story', 'campaign-outline'];
+  } else {
+    candidates = ['quiet-minimal', 'editorial-soft', 'warm-label'];
+  }
+
+  if (tone === 'minimal' || tone === 'professional' || tone === 'calm') {
+    candidates = ['quiet-minimal', 'serif-story', ...candidates];
+  }
+  if (humanPresence === 'hands_only' || humanPresence === 'partial_person') {
+    candidates = ['serif-story', 'warm-label', ...candidates];
+  }
+  if (placementHints.preferredAlignment === 'center' && objective === 'offer') {
+    candidates = ['campaign-outline', ...candidates];
+  }
+
+  const deduped = Array.from(new Set(candidates)).filter((entry) =>
+    (TEXT_TREATMENT_HINTS as readonly string[]).includes(entry)
+  );
+  if (deduped.length === 0) {
+    return 'editorial-soft';
+  }
+
+  const seed = stableHash([
+    promptPipeline.thoughtSession.targetAudience,
+    promptPipeline.thoughtSession.narrativeMoment,
+    promptPipeline.interpretiveLayer.selectedDirection,
+    promptPipeline.creativeInterpretation.visualPromise,
+    headlineFormula,
+    String(variantOffset),
+  ].join('|'));
+
+  return deduped[seed % deduped.length];
 }
 
 function nextVariantIndex(prompt: string, format?: string, templateId?: string): number {
@@ -166,22 +262,52 @@ export function generateAdSpec(
   parsed: ParsedPrompt,
   format?: string,
   templateId?: string,
-  variantOffset = 0
+  variantOffset = 0,
+  brandKit?: WebsiteBrandKit,
+  intent?: AdIntent
 ): AdSpec {
-  const { product, offer, vibe, colors, rawPrompt } = parsed;
+  let { product, offer, vibe, colors, rawPrompt } = parsed;
   const resolvedFormat = format ?? 'square';
   const isPartingWordPrompt = /partingword|partingword\.com|parting word|end[\s-]?of[\s-]?life messaging/i.test(rawPrompt);
 
+  if (brandKit) {
+    if (colors.length === 0 && brandKit.palette.length > 0) {
+      colors = [...brandKit.palette];
+    }
+    if (product === 'product' || product.length < 3) {
+      product = brandKit.brandName;
+    }
+  }
+  const contextualRawPrompt = brandKit?.contextSummary
+    ? `${rawPrompt}. Website context: ${brandKit.contextSummary}.`
+      + `${brandKit.businessType ? ` Business type: ${brandKit.businessType}.` : ''}`
+      + `${brandKit.targetAudience ? ` Target audience: ${brandKit.targetAudience}.` : ''}`
+      + `${brandKit.offerings && brandKit.offerings.length > 0 ? ` Core offerings: ${brandKit.offerings.join(', ')}.` : ''}`
+    : rawPrompt;
+
   // 1. Build strategy and prompt pipeline
   const strategy = buildPromptPipeline({
-    rawPrompt,
+    rawPrompt: contextualRawPrompt,
     product,
-    description: rawPrompt,
+    description: contextualRawPrompt,
     vibe,
     format: resolvedFormat,
     colors,
     offer: offer || undefined,
   });
+  const copyPlanning = {
+    targetAudience: strategy.promptPipeline.thoughtSession.targetAudience,
+    narrativeMoment: strategy.promptPipeline.thoughtSession.narrativeMoment,
+    copyStrategy: strategy.agenticPlan.copyStrategy,
+    emotionalTone: strategy.promptPipeline.creativeInterpretation.intent,
+    keyPhrases: [
+      strategy.promptPipeline.interpretiveLayer.selectedDirection,
+      strategy.promptPipeline.creativeInterpretation.sceneBrief,
+      ...(brandKit?.keyPhrases ?? []),
+    ],
+    brandName: brandKit?.brandName,
+    ctaPriority: strategy.placementHints.ctaPriority,
+  };
 
   // 2. Generate copy tied to objective and category
   const copy = generateCopy({
@@ -190,8 +316,10 @@ export function generateAdSpec(
     vibe,
     category: strategy.category,
     objective: strategy.objective,
-    rawPrompt,
+    rawPrompt: contextualRawPrompt,
     variantOffset,
+    planning: copyPlanning,
+    intent,
   });
 
   const copyValidation = validateCopy(copy);
@@ -204,7 +332,7 @@ export function generateAdSpec(
   const adColors: AdColors = {
     primary: colors[0] ?? vibeColors.primary,
     secondary: colors[1] ?? vibeColors.secondary,
-    accent: vibeColors.accent,
+    accent: colors[2] ?? vibeColors.accent,
     text: '#F7F7F2',
     background: vibe === 'minimal' || vibe === 'calm' ? '#12151C' : '#151922',
   };
@@ -224,13 +352,24 @@ export function generateAdSpec(
     copy.subhead,
     copy.cta,
     adColors.background,
-    adColors.accent
+    adColors.accent,
+    intent
   );
 
   adColors.text = layout.textColors.headline;
 
   // 5. Build AdSpec
-  const textTreatmentHintId = resolveTextTreatmentHint(strategy.objective, variantOffset);
+  const isCompassionateContext = /partingword|end[\s-]?of[\s-]?life|legacy|loved ones|grief|bereavement|after i'?m gone/i
+    .test(contextualRawPrompt);
+  const textTreatmentHintId = resolveTextTreatmentHint({
+    objective: strategy.objective,
+    vibe,
+    variantOffset,
+    promptPipeline: strategy.promptPipeline,
+    placementHints: strategy.placementHints,
+    isCompassionateContext,
+    headlineFormula: copy.formula,
+  });
   return {
     imagePrompt: strategy.promptPipeline.baseCreativeBrief,
     texts: {
@@ -251,11 +390,36 @@ export function generateAdSpec(
         provider: 'google',
         name: DEFAULT_IMAGE_MODEL,
       },
+      intent,
       headlineFormula: copy.formula,
+      brandMentionMode: copy.brandMention?.mode,
+      brandMentionValue: copy.brandMention?.value,
+      brandKit: brandKit
+        ? {
+            sourceUrl: brandKit.sourceUrl,
+            domain: brandKit.domain,
+            brandName: brandKit.brandName,
+            logoUrl: brandKit.logoUrl,
+            palette: brandKit.palette,
+            contextSummary: brandKit.contextSummary,
+            keyPhrases: brandKit.keyPhrases,
+            businessType: brandKit.businessType,
+            targetAudience: brandKit.targetAudience,
+            offerings: brandKit.offerings,
+          }
+        : undefined,
       contrastRatios: layout.contrastRatios,
       formatConfig: strategy.formatConfig as FormatConfig,
       copyVariantIndex: variantOffset,
       textTreatmentHintId,
+      copyPlan: {
+        planningDriven: Boolean(copy.planningDriven),
+        rationale: copy.planningRationale ?? [
+          `Audience: ${copyPlanning.targetAudience}`,
+          `Narrative: ${copyPlanning.narrativeMoment}`,
+        ],
+        strategy: strategy.agenticPlan.copyStrategy,
+      },
     },
   };
 }
@@ -263,18 +427,30 @@ export function generateAdSpec(
 export function createGenerateAdRouter(): Router {
   const router = Router();
 
-  router.post('/api/generate-ad', (req: Request, res: Response) => {
-    const { prompt, format, templateId } = req.body;
+  router.post('/api/generate-ad', async (req: Request, res: Response) => {
+    const { prompt, format, templateId, intent } = req.body;
 
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
       res.status(400).json({ error: 'Missing or invalid prompt' });
       return;
     }
 
+    if (prompt.length > 2000) {
+      res.status(400).json({ error: 'Prompt too long (max 2000 characters)' });
+      return;
+    }
+
+    const validIntents: AdIntent[] = ['conversion', 'awareness', 'retargeting'];
+    const resolvedIntent: AdIntent | undefined =
+      intent && validIntents.includes(intent) ? intent : undefined;
+
     const normalizedPrompt = prompt.trim();
     const parsed = parsePrompt(normalizedPrompt);
+    const brandKit = parsed.websiteUrl
+      ? await fetchWebsiteBrandKit(parsed.websiteUrl)
+      : undefined;
     const variantOffset = nextVariantIndex(normalizedPrompt, format, templateId);
-    const adSpec = generateAdSpec(parsed, format, templateId, variantOffset);
+    const adSpec = generateAdSpec(parsed, format, templateId, variantOffset, brandKit, resolvedIntent);
     res.json(adSpec);
   });
 

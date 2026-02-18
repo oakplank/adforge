@@ -1,5 +1,7 @@
 // Copy Engine - deterministic copy strategy with stronger CTA diversity.
 
+import type { AdIntent } from './types/textSystem.js';
+
 export type HeadlineFormula =
   | 'urgency'
   | 'benefit'
@@ -10,6 +12,17 @@ export type HeadlineFormula =
   | 'proof';
 
 type Objective = 'offer' | 'launch' | 'awareness';
+type CtaPriority = 'high' | 'medium' | 'low';
+
+export interface CopyPlanningLayer {
+  targetAudience?: string;
+  narrativeMoment?: string;
+  copyStrategy?: string;
+  emotionalTone?: string;
+  keyPhrases?: string[];
+  brandName?: string;
+  ctaPriority?: CtaPriority;
+}
 
 export interface CopyInput {
   product: string;
@@ -19,6 +32,8 @@ export interface CopyInput {
   objective?: Objective;
   rawPrompt?: string;
   variantOffset?: number;
+  planning?: CopyPlanningLayer;
+  intent?: AdIntent;
 }
 
 export interface CopyOutput {
@@ -26,6 +41,13 @@ export interface CopyOutput {
   subhead: string;
   cta: string;
   formula: HeadlineFormula;
+  planningDriven?: boolean;
+  planningRationale?: string[];
+  brandMention?: {
+    mode: 'none' | 'cta' | 'subhead' | 'headline';
+    value?: string;
+    subtle: boolean;
+  };
 }
 
 export interface ValidationResult {
@@ -44,11 +66,213 @@ function truncate(text: string, limit: number): string {
   if (normalized.length <= limit) return normalized;
 
   const slice = normalized.slice(0, limit).trimEnd();
+  const trimDangling = (value: string): string =>
+    value.replace(/\b(and|or|with|for|to|of|in|on|at|the|a|an|your|our)\b$/i, '').trim();
   const lastSpace = slice.lastIndexOf(' ');
   if (lastSpace > Math.floor(limit * 0.55)) {
-    return slice.slice(0, lastSpace).trimEnd();
+    const trimmed = trimDangling(slice.slice(0, lastSpace).trimEnd());
+    return trimmed || slice.slice(0, lastSpace).trimEnd();
   }
-  return slice;
+  const trimmed = trimDangling(slice);
+  return trimmed || slice;
+}
+
+function finalizeLine(text: string): string {
+  return text
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[,:;/-]+$/g, '')
+    .trim();
+}
+
+function pickFittingOption(options: string[], seed: number, limit: number): string | undefined {
+  if (options.length === 0) return undefined;
+  const normalized = options
+    .map((entry) => entry.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  if (normalized.length === 0) return undefined;
+
+  const start = seed % normalized.length;
+  for (let i = 0; i < normalized.length; i += 1) {
+    const candidate = normalized[(start + i) % normalized.length];
+    if (candidate.length <= limit) return candidate;
+  }
+  return undefined;
+}
+
+function normalizeDomain(raw: string): string | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  let normalized = trimmed
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .split(/[/?#]/)[0]
+    .replace(/[),.;:!?]+$/, '')
+    .toLowerCase();
+
+  if (!/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(normalized)) return undefined;
+  if (normalized.length < 4) return undefined;
+  return normalized;
+}
+
+function extractDomainFromText(text: string): string | undefined {
+  const match = text.match(/\b(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/[^\s]*)?/i);
+  if (!match) return undefined;
+  return normalizeDomain(match[0]);
+}
+
+function titleCaseWords(text: string): string {
+  return text
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => {
+      if (/^[A-Z0-9]+$/.test(word)) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+}
+
+function deriveBrandFromDomain(domain?: string): string | undefined {
+  if (!domain) return undefined;
+  const root = domain.split('.')[0] ?? '';
+  if (!root) return undefined;
+  const phrase = root.replace(/[-_]+/g, ' ').trim();
+  if (!phrase) return undefined;
+  return titleCaseWords(phrase);
+}
+
+function extractBrandFromRawPrompt(rawPrompt?: string): string | undefined {
+  if (!rawPrompt) return undefined;
+
+  const camelMatch = rawPrompt.match(/\b[A-Z][a-z]+[A-Z][A-Za-z]*\b/);
+  if (camelMatch?.[0]) return camelMatch[0];
+
+  const domainLabelMatch = rawPrompt.match(/\b([A-Za-z][A-Za-z0-9-]{2,})\.(com|io|co|ai|org|net)\b/);
+  if (domainLabelMatch?.[1]) {
+    return titleCaseWords(domainLabelMatch[1].replace(/[-_]+/g, ' '));
+  }
+
+  return undefined;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function textHasToken(text: string, token?: string): boolean {
+  if (!token) return false;
+  return new RegExp(escapeRegExp(token), 'i').test(text);
+}
+
+function buildSubheadWithTail(
+  subhead: string,
+  tails: string[],
+  seed: number
+): string | undefined {
+  if (tails.length === 0) return undefined;
+  const cleanSubhead = subhead.replace(/\s+/g, ' ').trim().replace(/[.!?]+$/, '');
+  const start = seed % tails.length;
+
+  for (let i = 0; i < tails.length; i += 1) {
+    const tail = tails[(start + i) % tails.length];
+    const candidate = `${cleanSubhead} ${tail}.`.replace(/\s+/g, ' ').trim();
+    if (candidate.length <= CHAR_LIMITS.subhead) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+function maybeApplyBrandMention(copy: CopyOutput, input: CopyInput, seed: number): CopyOutput {
+  const domain = extractDomainFromText(input.rawPrompt ?? '');
+  const brand = extractBrandFromRawPrompt(input.rawPrompt) ?? deriveBrandFromDomain(domain);
+  if (!domain && !brand) {
+    return {
+      ...copy,
+      brandMention: {
+        mode: 'none',
+        subtle: false,
+      },
+    };
+  }
+
+  const objective = objectiveFromInput(input);
+  const subtleByVibe = ['calm', 'minimal', 'luxury', 'professional'].includes(input.vibe.toLowerCase());
+  const subtle = subtleByVibe || isCompassionateContext(input);
+
+  const ctaCandidates = [
+    domain,
+    domain?.replace(/\.(com|io|co|ai|org|net)$/i, ''),
+    brand ? `Visit ${brand}` : undefined,
+    brand ? `${brand} Site` : undefined,
+    brand,
+  ].filter((entry): entry is string => Boolean(entry));
+
+  const ctaBrand = pickFittingOption(ctaCandidates, seed + 17, CHAR_LIMITS.cta);
+  const allowDirectBrandCta = !subtle && (objective === 'offer' || objective === 'launch');
+
+  if (allowDirectBrandCta && ctaBrand && !textHasToken(copy.cta, ctaBrand)) {
+    return {
+      ...copy,
+      cta: ctaBrand,
+      brandMention: {
+        mode: 'cta',
+        value: ctaBrand,
+        subtle: false,
+      },
+    };
+  }
+
+  if (!subtle && objective === 'awareness' && brand) {
+    const headlineCandidate = `${brand} ${copy.headline}`.replace(/\s+/g, ' ').trim();
+    if (
+      headlineCandidate.length <= CHAR_LIMITS.headline &&
+      !textHasToken(copy.headline, brand)
+    ) {
+      return {
+        ...copy,
+        headline: headlineCandidate,
+        brandMention: {
+          mode: 'headline',
+          value: brand,
+          subtle: false,
+        },
+      };
+    }
+  }
+
+  const tails = [
+    domain ? `at ${domain}` : undefined,
+    brand ? `with ${brand}` : undefined,
+  ].filter((entry): entry is string => Boolean(entry));
+
+  if (
+    !textHasToken(copy.subhead, domain) &&
+    !textHasToken(copy.subhead, brand)
+  ) {
+    const subtleSubhead = buildSubheadWithTail(copy.subhead, tails, seed + 29);
+    if (subtleSubhead) {
+      return {
+        ...copy,
+        subhead: subtleSubhead,
+        brandMention: {
+          mode: 'subhead',
+          value: domain ?? brand,
+          subtle: true,
+        },
+      };
+    }
+  }
+
+  return {
+    ...copy,
+    brandMention: {
+      mode: 'none',
+      value: domain ?? brand,
+      subtle,
+    },
+  };
 }
 
 function hasDiscount(offer?: string): boolean {
@@ -108,6 +332,58 @@ function detectCompassionTheme(input: CopyInput): CompassionTheme {
   return 'core';
 }
 
+function planningSignalText(input: CopyInput): string {
+  const planning = input.planning;
+  return [
+    input.product,
+    input.rawPrompt ?? '',
+    planning?.targetAudience ?? '',
+    planning?.narrativeMoment ?? '',
+    planning?.copyStrategy ?? '',
+    planning?.emotionalTone ?? '',
+    ...(planning?.keyPhrases ?? []),
+  ]
+    .join(' ')
+    .toLowerCase();
+}
+
+function deriveAudienceLabel(signalText: string): string {
+  if (/\b(caregiver|caregiver[s]?|coordinator|care team)\b/.test(signalText)) return 'caregivers';
+  if (/\b(children|kids|child)\b/.test(signalText)) return 'children';
+  if (/\b(parent|parents|family)\b/.test(signalText)) return 'family';
+  if (/\b(partner|spouse)\b/.test(signalText)) return 'your partner';
+  if (/\b(friend|friends)\b/.test(signalText)) return 'friends';
+  return 'loved ones';
+}
+
+function deriveFocusPhrase(signalText: string): string {
+  if (/\b(voice|audio|record|spoken)\b/.test(signalText)) return 'voice notes';
+  if (/\b(guidance|instruction|instructions|practical|care notes?)\b/.test(signalText)) return 'guidance';
+  if (/\b(values|faith|blessing|spiritual)\b/.test(signalText)) return 'values';
+  if (/\b(memory|memories)\b/.test(signalText)) return 'memories';
+  if (/\b(note|notes|letter|letters)\b/.test(signalText)) return 'messages';
+  return 'messages';
+}
+
+function deriveCompassionCtaCandidates(
+  objective: Objective,
+  ctaPriority: CtaPriority = 'medium'
+): string[] {
+  if (objective === 'offer') {
+    return ctaPriority === 'high'
+      ? ['Start Your Plan', 'Write First Note', 'Begin with Care', 'Plan Today']
+      : ['Start a Message', 'Plan with Care', 'Begin Your Plan'];
+  }
+
+  if (objective === 'launch') {
+    return ['See How It Works', 'Start a Message', 'Write First Note', 'Begin with Care'];
+  }
+
+  return ctaPriority === 'low'
+    ? ['Learn the Process', 'Explore Flow', 'See the Steps']
+    : ['Start a Message', 'See How It Works', 'Learn the Process'];
+}
+
 function hashSeed(parts: string[]): number {
   const text = parts.join('|').toLowerCase();
   let hash = 0;
@@ -147,6 +423,11 @@ function offerToken(offer?: string): string {
 }
 
 function formulaCandidates(input: CopyInput, objective: Objective): HeadlineFormula[] {
+  // Intent-based formula selection takes priority
+  if (input.intent === 'retargeting') return ['proof', 'benefit', 'question'];
+  if (input.intent === 'conversion') return ['urgency', 'number', 'benefit'];
+  if (input.intent === 'awareness') return ['benefit', 'curiosity', 'question'];
+
   const category = input.category.toLowerCase();
   const vibe = input.vibe.toLowerCase();
 
@@ -203,7 +484,7 @@ function generateHeadline(formula: HeadlineFormula, input: CopyInput, seed: numb
       return pickVariant(
         [
           `Ready for Better ${product}?`,
-          `Still Settling on ${product}?`,
+          `Looking for Better ${product}?`,
           `What If ${product} Felt Effortless?`,
         ],
         seed
@@ -293,7 +574,20 @@ function generateSubhead(formula: HeadlineFormula, input: CopyInput, seed: numbe
   return pickVariant(formulaLines[formula], seed + 7);
 }
 
+export const RETARGETING_CTA_CANDIDATES = [
+  'Come Back',
+  'Still Interested?',
+  'Complete Order',
+  'Finish Checkout',
+  'Return & Save',
+];
+
 function ctaCandidates(input: CopyInput, objective: Objective): string[] {
+  // Intent-based CTA selection
+  if (input.intent === 'retargeting') return RETARGETING_CTA_CANDIDATES;
+  if (input.intent === 'conversion') return ['Buy Now', 'Get Started', 'Claim Offer', 'Save Today'];
+  if (input.intent === 'awareness') return ['Learn More', 'Discover More', 'See Why', 'Explore'];
+
   const category = input.category.toLowerCase();
 
   if (objective === 'offer') {
@@ -335,6 +629,7 @@ function selectCta(input: CopyInput): string {
 function compassionateCopy(input: CopyInput): CopyOutput {
   const objective = objectiveFromInput(input);
   const variant = Math.abs(input.variantOffset ?? 0);
+  const planning = input.planning;
   const seed = hashSeed([
     input.product,
     input.rawPrompt ?? '',
@@ -537,6 +832,37 @@ function compassionateCopy(input: CopyInput): CopyOutput {
   const themeSubheads = subheadsByTheme[theme][objective];
   const themeCtas = ctasByTheme[theme][objective];
 
+  const signalText = planningSignalText(input);
+  const audienceLabel = deriveAudienceLabel(signalText);
+  const focusPhrase = deriveFocusPhrase(signalText);
+  const actionWord = /\b(record|voice)\b/.test(signalText) ? 'record' : 'write';
+  const planningBrand = planning?.brandName?.trim();
+  const dynamicHeadlines = [
+    `Keep ${toTitleCase(focusPhrase)} Safe`,
+    `Plan ${toTitleCase(focusPhrase)} Ahead`,
+    `Words for ${toTitleCase(audienceLabel)}`,
+    `${toTitleCase(focusPhrase)} with Care`,
+    planningBrand ? `${planningBrand} with Care` : '',
+  ]
+    .map((line) => finalizeLine(line))
+    .filter((line) => line.length > 0 && line.length <= CHAR_LIMITS.headline);
+
+  const dynamicSubheads = [
+    `A secure place to keep ${focusPhrase} for ${audienceLabel}.`,
+    `${toTitleCase(actionWord)} now so ${audienceLabel} can receive your words later.`,
+    `Preserve ${focusPhrase} and guidance in one trusted space.`,
+    planning?.copyStrategy
+      ? finalizeLine(planning.copyStrategy.replace(/^lead with\s+/i, ''))
+      : '',
+    planning?.narrativeMoment
+      ? finalizeLine(`Built for ${planning.narrativeMoment.toLowerCase()}.`)
+      : '',
+  ]
+    .map((line) => finalizeLine(line))
+    .filter((line) => line.length > 0 && line.length <= CHAR_LIMITS.subhead);
+
+  const dynamicCtas = deriveCompassionCtaCandidates(objective, planning?.ctaPriority);
+
   const identityByTheme: Record<CompassionTheme, string[]> = {
     core: [
       'PartingWord is a secure legacy messaging app.',
@@ -585,6 +911,7 @@ function compassionateCopy(input: CopyInput): CopyOutput {
 
   const subhead = pickWithinLimit(
     [
+      ...dynamicSubheads,
       pickVariant(themeSubheads, seed + 3 + variant),
       identity,
       value,
@@ -594,20 +921,49 @@ function compassionateCopy(input: CopyInput): CopyOutput {
     seed + 3 + variant * 3,
     CHAR_LIMITS.subhead
   );
-  const headline = pickWithinLimit(themeHeadlines, seed + variant * 7, CHAR_LIMITS.headline);
-  const cta = pickWithinLimit(themeCtas, seed + 5 + variant * 7, CHAR_LIMITS.cta);
+  const headline = pickWithinLimit(
+    [...dynamicHeadlines, ...themeHeadlines],
+    seed + variant * 7,
+    CHAR_LIMITS.headline
+  );
+  const cta = pickWithinLimit(
+    [...dynamicCtas, ...themeCtas],
+    seed + 5 + variant * 7,
+    CHAR_LIMITS.cta
+  );
 
   return {
-    headline,
-    subhead,
-    cta,
+    headline: finalizeLine(headline),
+    subhead: finalizeLine(subhead),
+    cta: finalizeLine(cta),
     formula: 'benefit',
+    planningDriven: Boolean(planning),
+    planningRationale: planning
+      ? [
+          `Audience: ${planning.targetAudience || audienceLabel}`,
+          `Focus: ${focusPhrase}`,
+          `Strategy: ${planning.copyStrategy || 'compassionate clarity + low-friction action'}`,
+        ]
+      : undefined,
+    brandMention: {
+      mode: 'none',
+      subtle: true,
+    },
   };
 }
 
 export function generateCopy(input: CopyInput): CopyOutput {
   if (isCompassionateContext(input)) {
-    return compassionateCopy(input);
+    const compassionate = compassionateCopy(input);
+    const seed = hashSeed([
+      input.product,
+      input.rawPrompt ?? '',
+      input.category,
+      input.vibe,
+      'brand-mention',
+      variantSalt(input),
+    ]);
+    return maybeApplyBrandMention(compassionate, input, seed);
   }
 
   const objective = objectiveFromInput(input);
@@ -631,9 +987,36 @@ export function generateCopy(input: CopyInput): CopyOutput {
 
   headline = truncate(headline, CHAR_LIMITS.headline);
   const subhead = truncate(generateSubhead(formula, input, seed), CHAR_LIMITS.subhead);
-  const cta = truncate(selectCta(input), CHAR_LIMITS.cta);
+  const planningCtas =
+    input.planning?.ctaPriority === 'high'
+      ? ['Get Started', 'Start Now', 'See Options']
+      : input.planning?.ctaPriority === 'low'
+        ? ['Learn More', 'See Details', 'Explore More']
+        : [];
+  const defaultCta = selectCta(input);
+  const cta = truncate(
+    pickWithinLimit([defaultCta, ...planningCtas], seed + 19, CHAR_LIMITS.cta),
+    CHAR_LIMITS.cta
+  );
 
-  return { headline, subhead, cta, formula };
+  const baseCopy: CopyOutput = {
+    headline: finalizeLine(headline),
+    subhead: finalizeLine(subhead),
+    cta: finalizeLine(cta),
+    formula,
+    planningDriven: Boolean(input.planning),
+    planningRationale: input.planning
+      ? [
+          `Audience: ${input.planning.targetAudience || 'broad paid-social audience'}`,
+          `Strategy: ${input.planning.copyStrategy || 'objective-first conversion copy'}`,
+        ]
+      : undefined,
+    brandMention: {
+      mode: 'none',
+      subtle: false,
+    },
+  };
+  return maybeApplyBrandMention(baseCopy, input, seed);
 }
 
 export const generateAdCopy = generateCopy;
