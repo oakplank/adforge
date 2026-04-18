@@ -193,6 +193,9 @@ export function useGeneration(): UseGenerationReturn {
       if (adSpec.metadata?.model?.name) {
         imageBody.model = adSpec.metadata.model.name;
       }
+      if (adSpec.metadata?.formatConfig?.aspectRatio) {
+        imageBody.aspectRatio = adSpec.metadata.formatConfig.aspectRatio;
+      }
 
       const imgRes = await fetch('/api/generate-image', {
         method: 'POST',

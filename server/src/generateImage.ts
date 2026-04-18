@@ -70,7 +70,8 @@ export class NanoBananaClient {
     height: number,
     enhancedPrompt?: string,
     systemPrompt?: string,
-    model?: string
+    model?: string,
+    aspectRatio?: string
   ): Promise<string> {
     if (!this.apiKey) {
       throw new Error('NANO_BANANA_API_KEY is not configured');
@@ -81,13 +82,26 @@ export class NanoBananaClient {
       enhancedPrompt?.trim() ||
       `Generate an image: ${prompt}. The image should be ${width}x${height} pixels, premium quality, professional advertising style.`;
 
+    const generationConfig: Record<string, unknown> = {
+      responseModalities: ['TEXT', 'IMAGE'],
+    };
+    // Gemini 3 Pro Image Preview returns letterboxed squares unless told the
+    // target ratio explicitly. Supported ratios per API: 1:1, 2:3, 3:2, 3:4,
+    // 4:3, 4:5, 5:4, 9:16, 16:9, 21:9.
+    const SUPPORTED_RATIOS = new Set([
+      '1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9',
+    ]);
+    if (aspectRatio && SUPPORTED_RATIOS.has(aspectRatio)) {
+      generationConfig.imageConfig = { aspectRatio };
+    }
+
     const payload: Record<string, unknown> = {
       contents: [
         {
           parts: [{ text: finalPrompt }],
         },
       ],
-      generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+      generationConfig,
     };
 
     if (systemPrompt?.trim()) {
@@ -151,7 +165,7 @@ export function createGenerateImageRouter(client?: NanoBananaClient): Router {
       return;
     }
 
-    const { prompt, width, height, enhancedPrompt, systemPrompt, model } = req.body;
+    const { prompt, width, height, enhancedPrompt, systemPrompt, model, aspectRatio } = req.body;
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
       res.status(400).json({ error: 'Missing or invalid prompt' });
       return;
@@ -169,7 +183,8 @@ export function createGenerateImageRouter(client?: NanoBananaClient): Router {
       const ep = enhancedPrompt && typeof enhancedPrompt === 'string' ? enhancedPrompt.trim() : undefined;
       const sp = systemPrompt && typeof systemPrompt === 'string' ? systemPrompt.trim() : undefined;
       const selectedModel = model && typeof model === 'string' ? model.trim() : undefined;
-      const result = await imageClient.generateImage(prompt.trim(), w, h, ep, sp, selectedModel);
+      const ar = aspectRatio && typeof aspectRatio === 'string' ? aspectRatio.trim() : undefined;
+      const result = await imageClient.generateImage(prompt.trim(), w, h, ep, sp, selectedModel, ar);
 
       if (result.startsWith('data:')) {
         const match = /^data:([^;]+);base64,(.+)$/.exec(result);

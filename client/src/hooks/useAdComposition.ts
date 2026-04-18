@@ -1,10 +1,10 @@
 import { useCallback } from 'react';
-import { Canvas, FabricImage, Textbox, Rect } from 'fabric';
+import { Canvas, FabricImage, Gradient, Shadow, Textbox, Rect } from 'fabric';
 import type { GenerationResult } from './useGeneration';
 import { getTemplateById, mapTemplateToFormat, type MappedSlot } from '../types/templates';
 import { useLayerStore } from '../store/layerStore';
 import type { TextStyle } from '../types/layers';
-import type { PlacementPlan, PlacementTextBlock, PlacementCtaBlock } from '../utils/imagePlacementAnalyzer';
+import type { PlacementPlan, PlacementOverlays, PlacementTextBlock, PlacementCtaBlock } from '../utils/imagePlacementAnalyzer';
 
 interface ComposeOptions {
   canvas: Canvas | null;
@@ -177,6 +177,102 @@ function addScrimIfNeeded(
   return { scrim, padX, padY };
 }
 
+// Edge-to-edge linear gradients give a cleaner editorial feel than per-block
+// grey pills. Top fades dark→transparent behind the headline; bottom fades
+// transparent→dark behind the CTA so it stays legible without a full pill.
+function addGradientOverlays(
+  canvas: Canvas,
+  addLayer: ReturnType<typeof useLayerStore.getState>['addLayer'],
+  overlays: PlacementOverlays,
+  canvasWidth: number,
+  canvasHeight: number
+): void {
+  if (overlays.top.enabled) {
+    const topHeight = canvasHeight * overlays.top.heightRatio;
+    const topRect = new Rect({
+      left: 0,
+      top: 0,
+      width: canvasWidth,
+      height: topHeight,
+      selectable: false,
+      evented: false,
+    });
+    topRect.set(
+      'fill',
+      new Gradient({
+        type: 'linear',
+        gradientUnits: 'pixels',
+        coords: { x1: 0, y1: 0, x2: 0, y2: topHeight },
+        colorStops: [
+          { offset: 0, color: `rgba(0, 0, 0, ${clamp(overlays.top.opacity, 0, 1)})` },
+          { offset: 1, color: 'rgba(0, 0, 0, 0)' },
+        ],
+      })
+    );
+    canvas.add(topRect);
+    addLayer({ type: 'shape', name: 'Top Overlay', fabricObject: topRect });
+  }
+
+  if (overlays.bottom.enabled) {
+    const bottomHeight = canvasHeight * overlays.bottom.heightRatio;
+    const bottomRect = new Rect({
+      left: 0,
+      top: canvasHeight - bottomHeight,
+      width: canvasWidth,
+      height: bottomHeight,
+      selectable: false,
+      evented: false,
+    });
+    bottomRect.set(
+      'fill',
+      new Gradient({
+        type: 'linear',
+        gradientUnits: 'pixels',
+        coords: { x1: 0, y1: 0, x2: 0, y2: bottomHeight },
+        colorStops: [
+          { offset: 0, color: 'rgba(0, 0, 0, 0)' },
+          { offset: 1, color: `rgba(0, 0, 0, ${clamp(overlays.bottom.opacity, 0, 1)})` },
+        ],
+      })
+    );
+    canvas.add(bottomRect);
+    addLayer({ type: 'shape', name: 'Bottom Overlay', fabricObject: bottomRect });
+  }
+}
+
+function buildTextShadow(): Shadow {
+  return new Shadow({
+    color: 'rgba(0, 0, 0, 0.55)',
+    blur: 14,
+    offsetX: 0,
+    offsetY: 2,
+  });
+}
+
+// Plans persisted before the overlay/gradient refactor carry scrim.enabled=true
+// and no overlays field. Normalize so loaded history renders in the new style.
+function normalizePlacementPlan(plan: PlacementPlan): PlacementPlan {
+  const disabledScrim: PlacementTextBlock['scrim'] = {
+    enabled: false,
+    color: '#000000',
+    opacity: 0,
+    padding: plan.headline.scrim.padding,
+  };
+
+  const overlays: PlacementOverlays = plan.overlays ?? {
+    top: { enabled: true, opacity: 0.42, heightRatio: 0.38 },
+    bottom: { enabled: true, opacity: 0.48, heightRatio: 0.34 },
+  };
+
+  return {
+    ...plan,
+    overlays,
+    headline: { ...plan.headline, scrim: disabledScrim },
+    subhead: { ...plan.subhead, scrim: disabledScrim },
+    cta: { ...plan.cta, scrim: disabledScrim },
+  };
+}
+
 function getScaledBounds(textbox: Textbox): { left: number; top: number; width: number; height: number } {
   const scaledWidth =
     typeof textbox.getScaledWidth === 'function'
@@ -261,7 +357,8 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
 
     const slots = mapTemplateToFormat(template, formatId);
     const textColor = adSpec.colors.text || '#FFFFFF';
-    const placementPlan: PlacementPlan | undefined = adSpec.metadata?.placementPlan;
+    const rawPlan: PlacementPlan | undefined = adSpec.metadata?.placementPlan;
+    const placementPlan: PlacementPlan | undefined = rawPlan ? normalizePlacementPlan(rawPlan) : undefined;
     const preferredAlignment =
       adSpec.metadata?.placementHints?.preferredAlignment || 'auto';
 
@@ -299,6 +396,10 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
       const ctaPx = toPixels(placementPlan.cta, canvasWidth, canvasHeight);
       const laneGap = canvasHeight * 0.02;
 
+      if (placementPlan.overlays) {
+        addGradientOverlays(canvas, addLayer, placementPlan.overlays, canvasWidth, canvasHeight);
+      }
+
       const headlineScrim = addScrimIfNeeded(
         canvas,
         addLayer,
@@ -319,6 +420,7 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
         fill: placementPlan.headline.color || headlineBaseStyle.fill,
         textAlign: placementPlan.headline.align,
         lineHeight: 1.03,
+        shadow: buildTextShadow(),
       });
       fitTextboxToHeight(headlineTextbox, headlinePx.height, 26, 2);
       trimTextToHeight(headlineTextbox, adSpec.texts.headline, headlinePx.height);
@@ -363,6 +465,7 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
         fill: placementPlan.subhead.color || subheadBaseStyle.fill,
         textAlign: placementPlan.subhead.align,
         lineHeight: 1.2,
+        shadow: buildTextShadow(),
       });
       fitTextboxToHeight(subheadTextbox, maxSubheadHeight, 14, 1);
       trimTextToHeight(subheadTextbox, adSpec.texts.subhead, maxSubheadHeight);
@@ -384,14 +487,15 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
       const subheadBottom = (subheadTextbox.top || subheadTop) + (subheadTextbox.height || maxSubheadHeight);
       const minCtaTop = subheadBottom + laneGap;
       const ctaTop = Math.max(ctaPx.top, minCtaTop);
+      const ctaFill = placementPlan.cta.buttonColor || adSpec.colors.accent || '#132B20';
       const ctaStrip = new Rect({
-        left: ctaPx.left - canvasWidth * 0.012,
-        top: ctaTop - canvasHeight * 0.007,
-        width: ctaPx.width + canvasWidth * 0.024,
-        height: ctaPx.height + canvasHeight * 0.014,
-        fill: hexToRgba(adSpec.colors.background || '#132B20', 0.74),
-        rx: 20,
-        ry: 20,
+        left: ctaPx.left,
+        top: ctaTop,
+        width: ctaPx.width,
+        height: ctaPx.height,
+        fill: ctaFill,
+        rx: placementPlan.cta.radius ?? 999,
+        ry: placementPlan.cta.radius ?? 999,
         selectable: false,
         evented: false,
       });
@@ -411,14 +515,39 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
       });
 
       canvas.add(ctaText);
-      linkBackdropToTextbox(
-        canvas,
-        ctaText,
-        ctaStrip,
-        canvasWidth * 0.012,
-        canvasHeight * 0.007,
-        ctaPx.height + canvasHeight * 0.014
-      );
+
+      // Pill hugs the text: re-fit width to measured text content after layout.
+      refreshTextboxMetrics(ctaText);
+      const measuredTextWidth =
+        typeof ctaText.calcTextWidth === 'function'
+          ? ctaText.calcTextWidth()
+          : ctaText.width || ctaPx.width;
+      const horizontalPadding = Math.max(canvasWidth * 0.028, ctaTextSize * 0.9);
+      const verticalPadding = Math.max(canvasHeight * 0.012, ctaTextSize * 0.55);
+      const pillWidth = Math.min(ctaPx.width, measuredTextWidth + horizontalPadding * 2);
+      const pillHeight = ctaTextSize + verticalPadding * 2;
+      const alignment = placementPlan.cta.align || 'center';
+      const pillLeft =
+        alignment === 'center'
+          ? ctaPx.left + (ctaPx.width - pillWidth) / 2
+          : alignment === 'right'
+            ? ctaPx.left + ctaPx.width - pillWidth
+            : ctaPx.left;
+
+      ctaStrip.set({
+        left: pillLeft,
+        top: ctaTop,
+        width: pillWidth,
+        height: pillHeight,
+      });
+      ctaStrip.setCoords();
+
+      ctaText.set({
+        left: pillLeft,
+        width: pillWidth,
+        top: ctaTop + verticalPadding,
+      });
+      refreshTextboxMetrics(ctaText);
       const ctaLayerId = addLayer({ type: 'text', name: 'CTA', fabricObject: ctaText });
       useLayerStore.getState().updateTextStyle(ctaLayerId, {
         ...headlineBaseStyle,

@@ -24,10 +24,22 @@ export interface PlacementCtaBlock extends PlacementTextBlock {
   radius: number;
 }
 
+export interface PlacementGradient {
+  enabled: boolean;
+  opacity: number;
+  heightRatio: number;
+}
+
+export interface PlacementOverlays {
+  top: PlacementGradient;
+  bottom: PlacementGradient;
+}
+
 export interface PlacementPlan {
   headline: PlacementTextBlock;
   subhead: PlacementTextBlock;
   cta: PlacementCtaBlock;
+  overlays: PlacementOverlays;
   confidence: number;
   rationale: string[];
 }
@@ -236,17 +248,21 @@ function getButtonTextColor(buttonColor: string): string {
   return contrastRatio(1, lum) >= contrastRatio(0, lum) ? SAFE_WHITE : SAFE_BLACK;
 }
 
-function buildScrim(clutter: number, contrast: number): PlacementScrim {
-  const shouldUse = clutter > 0.24 || contrast < 4.8;
-  if (!shouldUse) {
-    return { enabled: false, color: '#000000', opacity: 0, padding: 0.012 };
-  }
+// Per-block scrim pills flattened outputs visually — replaced by full-width
+// top/bottom gradient overlays (see buildOverlays). We keep the scrim shape
+// on the returned plan but always disabled so downstream renders skip it.
+function buildScrim(_clutter: number, _contrast: number): PlacementScrim {
+  return { enabled: false, color: '#000000', opacity: 0, padding: 0.012 };
+}
+
+function buildOverlays(topClutter: number, bottomClutter: number, topContrast: number, bottomContrast: number): PlacementOverlays {
+  // Darker gradient when the underlying zone has clutter or weak contrast.
+  const topOpacity = clamp(0.22 + topClutter * 0.45 + (topContrast < 4.8 ? 0.12 : 0), 0.22, 0.62);
+  const bottomOpacity = clamp(0.24 + bottomClutter * 0.45 + (bottomContrast < 4.8 ? 0.12 : 0), 0.24, 0.65);
 
   return {
-    enabled: true,
-    color: contrast < 4.8 ? '#000000' : '#0E1218',
-    opacity: clamp(0.18 + clutter * 0.55 + (contrast < 4.8 ? 0.12 : 0), 0.2, 0.62),
-    padding: 0.016,
+    top: { enabled: true, opacity: topOpacity, heightRatio: 0.38 },
+    bottom: { enabled: true, opacity: bottomOpacity, heightRatio: 0.34 },
   };
 }
 
@@ -325,6 +341,12 @@ export function buildPlacementPlanFromImageData(image: PixelLikeImageData, hints
         radius: 24,
         scrim: buildScrim(ctaStat.clutter * 0.6, ctaStat.preferredContrast),
       },
+      overlays: buildOverlays(
+        headlineStat.clutter,
+        ctaStat.clutter,
+        headlineStat.preferredContrast,
+        ctaStat.preferredContrast
+      ),
       confidence,
       rationale: [
         `Structured ${hints.preferredAlignment} text lane enforced to avoid collisions.`,
@@ -388,6 +410,12 @@ export function buildPlacementPlanFromImageData(image: PixelLikeImageData, hints
       radius: 18,
       scrim: buildScrim(ctaZone.clutter * 0.75, ctaZone.preferredContrast),
     },
+    overlays: buildOverlays(
+      headlineZone.clutter,
+      ctaZone.clutter,
+      headlineZone.preferredContrast,
+      ctaZone.preferredContrast
+    ),
     confidence,
     rationale: [
       `Headline zone: ${headlineZone.zone.id} (clutter ${headlineZone.clutter.toFixed(2)}).`,

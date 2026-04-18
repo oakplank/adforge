@@ -141,8 +141,14 @@ export function createGenerationsRouter(store?: GenerationsStore): Router {
         return;
       }
 
+      // dotfiles: 'allow' so paths containing hidden directories (e.g. .claude
+      // worktrees) aren't blocked by send's default dotfile policy.
       res.type(image.mimeType);
-      res.sendFile(image.filePath);
+      res.sendFile(image.filePath, { dotfiles: 'allow' }, (err) => {
+        if (err && !res.headersSent) {
+          res.status(500).json({ error: 'Failed to stream generation image' });
+        }
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load generation image';
       res.status(500).json({ error: message });

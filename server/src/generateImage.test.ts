@@ -147,6 +147,44 @@ describe('NanoBananaClient', () => {
     expect(result).toBe('data:image/jpeg;base64,jpegdata');
   });
 
+  it('includes imageConfig.aspectRatio in payload when a supported ratio is passed', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        candidates: [{
+          content: {
+            parts: [{ inlineData: { mimeType: 'image/png', data: 'x' } }],
+          },
+        }],
+      }),
+    });
+    globalThis.fetch = mockFetch;
+
+    const client = new NanoBananaClient('key');
+    await client.generateImage('p', 1080, 1350, undefined, undefined, undefined, '4:5');
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.generationConfig.imageConfig.aspectRatio).toBe('4:5');
+  });
+
+  it('omits imageConfig when aspectRatio is unsupported', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        candidates: [{
+          content: {
+            parts: [{ inlineData: { mimeType: 'image/png', data: 'x' } }],
+          },
+        }],
+      }),
+    });
+    globalThis.fetch = mockFetch;
+
+    const client = new NanoBananaClient('key');
+    await client.generateImage('p', 1080, 1080, undefined, undefined, undefined, '7:13');
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.generationConfig.imageConfig).toBeUndefined();
+  });
+
   it('throws error when response has no image data', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
