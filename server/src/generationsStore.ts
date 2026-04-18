@@ -223,7 +223,12 @@ export class GenerationsStore {
       return null;
     }
 
-    const filePath = path.join(this.getDir(), entry.image.fileName);
+    const dir = this.getDir();
+    const filePath = path.resolve(dir, entry.image.fileName);
+    if (!filePath.startsWith(dir + path.sep) && filePath !== dir) {
+      return null;
+    }
+
     try {
       await fs.access(filePath);
       return {

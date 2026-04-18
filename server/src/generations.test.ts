@@ -78,4 +78,27 @@ describe('Generations API', () => {
     expect(saveRes.status).toBe(201);
     expect(saveRes.body.generation.imageUrl).toBe('https://example.com/image.png');
   });
+
+  it('rejects image lookup when stored fileName escapes the generations dir', async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'adforge-traversal-'));
+    const store = new GenerationsStore(tempDir);
+
+    // Forge a JSON record whose fileName points outside the dir.
+    const id = 'gen-forged';
+    const forged = {
+      id,
+      createdAt: new Date().toISOString(),
+      prompt: 'x',
+      format: 'square',
+      imagePrompt: 'x',
+      adSpec: {},
+      image: { kind: 'local', mimeType: 'image/png', fileName: '../escape.png' },
+    };
+    await fs.writeFile(path.join(tempDir, `${id}.json`), JSON.stringify(forged), 'utf8');
+    // Create the target so the access check would otherwise succeed.
+    await fs.writeFile(path.join(tempDir, '..', 'escape.png'), 'nope');
+
+    const result = await store.resolveImagePath(id);
+    expect(result).toBeNull();
+  });
 });
