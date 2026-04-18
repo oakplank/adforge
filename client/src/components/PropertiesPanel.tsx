@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import type { FabricObject, FabricImage, Canvas } from 'fabric';
 import { useLayerStore } from '../store/layerStore';
 import type { LayerTransform } from '../types/layers';
 import { TypographyControls } from './TypographyControls';
@@ -31,13 +32,13 @@ function PropertyField({ label, value, onChange, min, max, step = 1 }: {
   );
 }
 
-function ImageControls({ layer }: { layer: { fabricObject: any } }) {
+function ImageControls({ layer }: { layer: { fabricObject: FabricObject | null } }) {
   const [aspectLocked, setAspectLocked] = useState(true);
 
   const toggleAspectLock = useCallback(() => {
     const newLocked = !aspectLocked;
     setAspectLocked(newLocked);
-    const obj = layer.fabricObject;
+    const obj = layer.fabricObject as (FabricImage & { lockUniScaling?: boolean }) | null;
     if (obj && typeof obj.setControlsVisibility === 'function') {
       if (newLocked) {
         obj.setControlsVisibility({ mb: false, mt: false, ml: false, mr: false });
@@ -46,8 +47,9 @@ function ImageControls({ layer }: { layer: { fabricObject: any } }) {
         obj.setControlsVisibility({ mb: true, mt: true, ml: true, mr: true });
         obj.lockUniScaling = false;
       }
-      if (obj.canvas && typeof obj.canvas.requestRenderAll === 'function') {
-        obj.canvas.requestRenderAll();
+      const parentCanvas = obj.canvas as Canvas | undefined;
+      if (parentCanvas && typeof parentCanvas.requestRenderAll === 'function') {
+        parentCanvas.requestRenderAll();
       }
     }
   }, [aspectLocked, layer.fabricObject]);

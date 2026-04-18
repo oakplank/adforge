@@ -1,8 +1,9 @@
+import type { Canvas } from 'fabric';
 import { useLayerStore } from '../store/layerStore';
 import { useBackgroundTool } from '../hooks/useBackgroundTool';
 import type { BackgroundStyle } from '../types/shapes';
 
-export function BackgroundControls({ canvas }: { canvas: any }) {
+export function BackgroundControls({ canvas }: { canvas: Canvas | null }) {
   const selectedLayerId = useLayerStore((s) => s.selectedLayerId);
   const layers = useLayerStore((s) => s.layers);
   const { applyBackgroundStyle } = useBackgroundTool(canvas);
