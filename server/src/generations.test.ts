@@ -109,6 +109,21 @@ describe('Generations API', () => {
     ]);
   });
 
+  it('rejects imageUrl with a non-http(s) scheme', async () => {
+    const { app } = await createTestApp();
+
+    const res = await request(app).post('/api/generations').send({
+      prompt: 'bad url',
+      format: 'square',
+      imagePrompt: 'prompt',
+      adSpec: { templateId: 'bold-sale' },
+      imageUrl: 'javascript:alert(1)',
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('http');
+  });
+
   it('rejects image lookup when stored fileName escapes the generations dir', async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'adforge-traversal-'));
     const store = new GenerationsStore(tempDir);

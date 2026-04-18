@@ -7,6 +7,15 @@ function toPositiveInt(value: unknown, fallback: number): number {
   return parsed;
 }
 
+function isSafeHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function createGenerationsRouter(store?: GenerationsStore): Router {
   const router = Router();
   const generationsStore = store ?? new GenerationsStore();
@@ -60,6 +69,11 @@ export function createGenerationsRouter(store?: GenerationsStore): Router {
 
     if (!imageBase64 && !imageUrl) {
       res.status(400).json({ error: 'Missing image payload' });
+      return;
+    }
+
+    if (!imageBase64 && typeof imageUrl === 'string' && !isSafeHttpUrl(imageUrl)) {
+      res.status(400).json({ error: 'imageUrl must be an http(s) URL' });
       return;
     }
 
