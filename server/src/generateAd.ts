@@ -32,13 +32,13 @@ const COLOR_NAME_MAP: Record<string, string> = {
   white: '#FFFFFF', gold: '#C9A84C', silver: '#9E9E9E', teal: '#00897B',
 };
 
-export interface AdTexts {
+interface AdTexts {
   headline: string;
   subhead: string;
   cta: string;
 }
 
-export interface AdColors {
+interface AdColors {
   primary: string;
   secondary: string;
   accent: string;
@@ -46,7 +46,7 @@ export interface AdColors {
   background: string;
 }
 
-export interface AdSpec {
+interface AdSpec {
   imagePrompt: string;
   texts: AdTexts;
   colors: AdColors;

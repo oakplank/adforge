@@ -23,7 +23,6 @@ import {
 export {
   CATEGORY_CONFIGS,
   FORMAT_CONFIGS,
-  type CategoryConfig,
   type FormatConfig,
 } from './promptEngineData.js';
 

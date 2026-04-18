@@ -35,7 +35,7 @@ async function ensureDirExists(dirPath: string): Promise<void> {
   await fs.mkdir(dirPath, { recursive: true });
 }
 
-export interface GenerationSaveInput {
+interface GenerationSaveInput {
   prompt: string;
   format: string;
   width?: number;
@@ -70,7 +70,7 @@ interface StoredGeneration {
   };
 }
 
-export interface GenerationRecord {
+interface GenerationRecord {
   id: string;
   createdAt: string;
   prompt: string;

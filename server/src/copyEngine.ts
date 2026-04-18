@@ -1,6 +1,6 @@
 // Copy Engine - deterministic copy strategy with stronger CTA diversity.
 
-export type HeadlineFormula =
+type HeadlineFormula =
   | 'urgency'
   | 'benefit'
   | 'question'
@@ -11,7 +11,7 @@ export type HeadlineFormula =
 
 type Objective = 'offer' | 'launch' | 'awareness';
 
-export interface CopyInput {
+interface CopyInput {
   product: string;
   offer?: string;
   vibe: string;
@@ -20,14 +20,14 @@ export interface CopyInput {
   rawPrompt?: string;
 }
 
-export interface CopyOutput {
+interface CopyOutput {
   headline: string;
   subhead: string;
   cta: string;
   formula: HeadlineFormula;
 }
 
-export interface ValidationResult {
+interface ValidationResult {
   valid: boolean;
   errors: string[];
 }
