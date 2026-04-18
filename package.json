@@ -2,6 +2,9 @@
   "name": "adforge",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "install:all": "npm install --prefix server && npm install --prefix client",
     "test": "npm test --prefix server && npm test --prefix client",

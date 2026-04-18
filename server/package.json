@@ -1,6 +1,9 @@
 {
   "name": "adforge-server",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run --dir src",
