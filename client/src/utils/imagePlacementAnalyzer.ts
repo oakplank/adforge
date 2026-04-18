@@ -37,6 +37,7 @@ export interface PlacementHints {
   objective?: 'offer' | 'launch' | 'awareness';
   preferredAlignment?: HorizontalAlign | 'auto';
   preferredHeadlineBand?: 'top' | 'upper';
+  avoidCenter?: boolean;
   accentColor?: string;
   backgroundColor?: string;
 }
@@ -177,7 +178,11 @@ function scoreHeadlineZone(stat: ZoneStats, hints: PlacementHints): number {
   }
 
   if (hints.preferredAlignment && hints.preferredAlignment !== 'auto' && stat.zone.align !== hints.preferredAlignment) {
-    score += 0.1;
+    score += 0.3;
+  }
+
+  if (hints.avoidCenter && stat.zone.align === 'center') {
+    score += 0.4;
   }
 
   if (stat.preferredContrast < 4.5) {
@@ -196,6 +201,10 @@ function scoreCtaZone(stat: ZoneStats, hints: PlacementHints): number {
 
   if (hints.objective === 'offer' && stat.zone.align !== 'center') {
     score += 0.08;
+  }
+
+  if (hints.avoidCenter && hints.objective !== 'offer' && stat.zone.align === 'center') {
+    score += 0.22;
   }
 
   if (stat.preferredContrast < 4.5) {
@@ -241,7 +250,242 @@ function buildScrim(clutter: number, contrast: number): PlacementScrim {
   };
 }
 
+function buildStructuredLane(
+  formatId: PlacementHints['formatId'],
+  align: HorizontalAlign
+): { headline: ZoneSpec; subhead: ZoneSpec; cta: ZoneSpec } {
+  const isStory = formatId === 'story';
+  const margin = isStory ? 0.06 : 0.055;
+  const sideWidth = isStory ? 0.38 : 0.34;
+  const centerWidth = isStory ? 0.68 : 0.64;
+  const laneWidth = align === 'center' ? centerWidth : sideWidth;
+  const laneX =
+    align === 'left'
+      ? margin
+      : align === 'right'
+        ? 1 - margin - laneWidth
+        : (1 - laneWidth) / 2;
+  const topY = isStory ? 0.07 : 0.065;
+  const headlineZoneHeight = isStory ? 0.19 : 0.2;
+  const subY = topY + headlineZoneHeight + (isStory ? 0.03 : 0.028);
+  const subZoneHeight = isStory ? 0.14 : 0.13;
+  const ctaY = isStory ? 0.84 : 0.82;
+  const ctaWidth = align === 'center' ? Math.min(0.38, laneWidth * 0.58) : Math.min(0.26, laneWidth * 0.72);
+  const ctaX =
+    align === 'center'
+      ? 0.5 - ctaWidth / 2
+      : align === 'right'
+        ? laneX + laneWidth - ctaWidth
+        : laneX;
+
+  return {
+    headline: {
+      id: `lane-headline-${align}`,
+      x: laneX,
+      y: topY,
+      w: laneWidth,
+      h: headlineZoneHeight,
+      band: 'top',
+      align,
+    },
+    subhead: {
+      id: `lane-subhead-${align}`,
+      x: laneX,
+      y: subY,
+      w: laneWidth,
+      h: subZoneHeight,
+      band: 'middle',
+      align,
+    },
+    cta: {
+      id: `lane-cta-${align}`,
+      x: ctaX,
+      y: ctaY,
+      w: ctaWidth,
+      h: isStory ? 0.07 : 0.075,
+      band: 'bottom',
+      align,
+    },
+  };
+}
+
+function laneAlignCandidates(hints: PlacementHints): HorizontalAlign[] {
+  if (hints.preferredAlignment && hints.preferredAlignment !== 'auto') {
+    const opposite: Record<HorizontalAlign, HorizontalAlign> = {
+      left: 'right',
+      right: 'left',
+      center: 'center',
+    };
+    const list: HorizontalAlign[] = [hints.preferredAlignment, opposite[hints.preferredAlignment]];
+    if (!hints.avoidCenter && hints.preferredAlignment !== 'center') {
+      list.push('center');
+    }
+    return Array.from(new Set(list));
+  }
+
+  if (hints.avoidCenter) {
+    return ['left', 'right'];
+  }
+
+  if (hints.objective === 'offer') {
+    return ['center', 'left', 'right'];
+  }
+
+  return ['left', 'right', 'center'];
+}
+
+function scoreStructuredLane(
+  headlineStat: ZoneStats,
+  subheadStat: ZoneStats,
+  ctaStat: ZoneStats,
+  hints: PlacementHints
+): number {
+  let score = headlineStat.clutter * 1.65 + subheadStat.clutter * 1.4 + ctaStat.clutter * 1.05;
+  const minContrast = Math.min(
+    headlineStat.preferredContrast,
+    subheadStat.preferredContrast,
+    ctaStat.preferredContrast
+  );
+
+  if (minContrast < 4.5) {
+    score += (4.5 - minContrast) * 0.24;
+  }
+
+  if (
+    hints.preferredAlignment &&
+    hints.preferredAlignment !== 'auto' &&
+    headlineStat.zone.align !== hints.preferredAlignment
+  ) {
+    score += 0.34;
+  }
+
+  if (hints.avoidCenter && headlineStat.zone.align === 'center') {
+    score += 0.46;
+  }
+
+  if (hints.objective === 'offer' && headlineStat.zone.align === 'center') {
+    score -= 0.05;
+  }
+
+  if (Math.abs(headlineStat.meanLuminance - subheadStat.meanLuminance) > 0.22) {
+    score += 0.08;
+  }
+
+  return score;
+}
+
+function chooseBestStructuredLane(
+  image: PixelLikeImageData,
+  hints: PlacementHints
+): {
+  lane: { headline: ZoneSpec; subhead: ZoneSpec; cta: ZoneSpec };
+  headlineStat: ZoneStats;
+  subheadStat: ZoneStats;
+  ctaStat: ZoneStats;
+  totalScore: number;
+} | null {
+  const candidates = laneAlignCandidates(hints);
+  if (candidates.length === 0) return null;
+
+  let best:
+    | {
+        lane: { headline: ZoneSpec; subhead: ZoneSpec; cta: ZoneSpec };
+        headlineStat: ZoneStats;
+        subheadStat: ZoneStats;
+        ctaStat: ZoneStats;
+        totalScore: number;
+      }
+    | null = null;
+
+  for (const align of candidates) {
+    const lane = buildStructuredLane(hints.formatId, align);
+    const headlineStat = measureZone(image, lane.headline);
+    const subheadStat = measureZone(image, lane.subhead);
+    const ctaStat = measureZone(image, lane.cta);
+    const totalScore = scoreStructuredLane(headlineStat, subheadStat, ctaStat, hints);
+
+    if (!best || totalScore < best.totalScore) {
+      best = { lane, headlineStat, subheadStat, ctaStat, totalScore };
+    }
+  }
+
+  return best;
+}
+
 export function buildPlacementPlanFromImageData(image: PixelLikeImageData, hints: PlacementHints = {}): PlacementPlan {
+  const shouldUseStructuredPlanner =
+    hints.avoidCenter === true ||
+    (hints.preferredAlignment !== undefined && hints.preferredAlignment !== 'auto') ||
+    hints.objective === 'launch' ||
+    hints.objective === 'awareness';
+
+  if (shouldUseStructuredPlanner) {
+    const bestLane = chooseBestStructuredLane(image, hints);
+    if (bestLane) {
+      const { lane, headlineStat, subheadStat, ctaStat, totalScore } = bestLane;
+      const headlineHeight = hints.formatId === 'story' ? 0.13 : 0.14;
+      const subheadHeight = hints.formatId === 'story' ? 0.09 : 0.095;
+      const subheadY = clamp(
+        lane.headline.y + headlineHeight + (hints.formatId === 'story' ? 0.024 : 0.02),
+        lane.subhead.y,
+        hints.formatId === 'story' ? 0.74 : 0.68
+      );
+
+      const baseAccent = hints.accentColor || '#2D6A4F';
+      const buttonStyle =
+        hints.objective === 'launch'
+          ? 'outline'
+          : hints.objective === 'awareness'
+            ? 'ghost'
+            : 'solid';
+      const confidence = clamp(
+        1 - (totalScore * 0.26 + headlineStat.clutter * 0.22 + ctaStat.clutter * 0.14),
+        0.38,
+        0.97
+      );
+
+      return {
+        headline: {
+          x: lane.headline.x,
+          y: lane.headline.y,
+          width: lane.headline.w,
+          height: headlineHeight,
+          align: lane.headline.align,
+          color: headlineStat.preferredTextColor,
+          scrim: buildScrim(headlineStat.clutter, headlineStat.preferredContrast),
+        },
+        subhead: {
+          x: lane.subhead.x,
+          y: subheadY,
+          width: lane.subhead.w,
+          height: subheadHeight,
+          align: lane.subhead.align,
+          color: subheadStat.preferredTextColor,
+          scrim: buildScrim(subheadStat.clutter * 0.92, subheadStat.preferredContrast),
+        },
+        cta: {
+          x: lane.cta.x,
+          y: lane.cta.y,
+          width: lane.cta.w,
+          height: hints.formatId === 'story' ? 0.06 : 0.065,
+          align: 'center',
+          color: getButtonTextColor(baseAccent),
+          textColor: getButtonTextColor(baseAccent),
+          buttonColor: baseAccent,
+          buttonStyle,
+          radius: 18,
+          scrim: buildScrim(ctaStat.clutter * 0.68, ctaStat.preferredContrast),
+        },
+        confidence,
+        rationale: [
+          `Adaptive lane selected on ${lane.headline.align} from per-side clutter and contrast scoring.`,
+          `Lane score ${totalScore.toFixed(2)}. Headline clutter ${headlineStat.clutter.toFixed(2)}, subhead clutter ${subheadStat.clutter.toFixed(2)}.`,
+          `CTA contrast ${ctaStat.preferredContrast.toFixed(2)} with compact action lane sizing.`,
+        ],
+      };
+    }
+  }
+
   const zones = getZones(hints.formatId);
   const zoneStats = zones.map((zone) => measureZone(image, zone));
 

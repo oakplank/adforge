@@ -1,0 +1,13 @@
+{
+  "id": "05-voice-focus-angle",
+  "prompt": "PartingWord voice and written message preservation campaign, emotionally specific but clear, no generic CTA marketing jargon.",
+  "screenshotFull": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_after_copyfix_2026-02-16/05-voice-focus-angle-full.png",
+  "screenshotCanvas": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_after_copyfix_2026-02-16/05-voice-focus-angle-canvas.png",
+  "text": {
+    "headline": "When Words Matter Most",
+    "subhead": "Turn meaningful thoughts into lasting messages your family can keep.",
+    "cta": "Start a Message"
+  },
+  "templateId": "minimal",
+  "objective": "awareness"
+}

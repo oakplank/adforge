@@ -1,0 +1,36 @@
+{
+  "id": "01-core-launch",
+  "prompt": "PartingWord.com launch ad for end-of-life messaging platform, compassionate premium tone for adults preparing messages for loved ones, dark green and cream beige.",
+  "screenshotFull": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_2026-02-16/01-core-launch-full.png",
+  "screenshotCanvas": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_2026-02-16/01-core-launch-canvas.png",
+  "text": {
+    "headline": "Messages for the People You Love",
+    "subhead": "Capture guidance, love, and practical notes for the people who matter m…",
+    "cta": "See How It Works"
+  },
+  "templateId": "minimal",
+  "objective": "launch",
+  "thoughtSession": {
+    "targetAudience": "end-of-life messaging platform",
+    "decisionSummary": "Audience-first launch narrative for end-of-life messaging platform, resolved as \"Voice Legacy\" with partial_person human presence and high documentary-style photorealism with compassionate editorial polish.",
+    "narrativeMoment": "a real moment of preparing a meaningful future message in a lived-in home environment",
+    "humanPresence": "partial_person",
+    "realismLevel": "high documentary-style photorealism with compassionate editorial polish",
+    "realismCues": [
+      "natural hand posture and non-posed gestures",
+      "subtle material wear (paper grain, leather texture, wood imperfections)",
+      "soft shadow falloff from real window or practical light sources"
+    ],
+    "subjectPriority": "hero subject should feel meaningful and emotionally grounded, occupying 38-52% of the frame",
+    "backgroundPriority": "background should provide lived-in emotional context while keeping a clean low-detail text lane",
+    "lightingApproach": "soft directional natural light with gentle contrast, avoiding harsh dramatic stylization",
+    "compositionApproach": "asymmetric narrative composition with one-third subject bias, no centered tabletop default, and intentional breathing room",
+    "regenerationTriggers": [
+      "scene appears as isolated object on blank/white sterile background",
+      "composition defaults to centered static tabletop symmetry",
+      "human presence policy is violated or feels staged",
+      "text lane has noisy gradients/bokeh that harm readability",
+      "props conflict with narrative moment or audience context"
+    ]
+  }
+}

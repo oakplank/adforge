@@ -1,4 +1,6 @@
+import type { AdIntent } from './types/textSystem.js';
 export declare const WCAG_AA_RATIO = 4.5;
+/** @deprecated Use SAFE_ZONE_SPECS from designTokens instead */
 export declare const SAFE_ZONES: {
     square: {
         top: number;
@@ -13,6 +15,7 @@ export declare const SAFE_ZONES: {
         bottom: number;
     };
 };
+/** @deprecated Use TYPOGRAPHY_SCALE from designTokens instead */
 export declare const FONT_SIZES: {
     headline: {
         min: number;
@@ -74,7 +77,7 @@ export declare function findAccessibleTextColor(bgColor: string, preferred?: str
     ratio: number;
 };
 export declare function calculateFontSize(text: string, config: FontSizeConfig, containerWidth: number): number;
-export declare function generateLayout(format: string, headline: string, subhead: string, ctaText: string, bgColor: string, accentColor: string): LayoutOutput;
+export declare function generateLayout(format: string, headline: string, subhead: string, ctaText: string, bgColor: string, accentColor: string, intent?: AdIntent): LayoutOutput;
 export declare function validateLayout(layout: LayoutOutput): {
     valid: boolean;
     warnings: string[];

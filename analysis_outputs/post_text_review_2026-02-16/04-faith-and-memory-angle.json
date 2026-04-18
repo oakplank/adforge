@@ -1,0 +1,36 @@
+{
+  "id": "04-faith-and-memory-angle",
+  "prompt": "PartingWord legacy messages for families preserving values, memories, and blessings, dignified and human, not salesy.",
+  "screenshotFull": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_2026-02-16/04-faith-and-memory-angle-full.png",
+  "screenshotCanvas": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_2026-02-16/04-faith-and-memory-angle-canvas.png",
+  "text": {
+    "headline": "Your Voice, Preserved With Care",
+    "subhead": "Prepare heartfelt messages now so loved ones have your words later.",
+    "cta": "Start a Message"
+  },
+  "templateId": "minimal",
+  "objective": "offer",
+  "thoughtSession": {
+    "targetAudience": "families preserving values",
+    "decisionSummary": "Audience-first offer narrative for families preserving values, resolved as \"Voice Legacy\" with hands_only human presence and high documentary-style photorealism with compassionate editorial polish.",
+    "narrativeMoment": "a real moment of preparing a meaningful future message in a lived-in home environment",
+    "humanPresence": "hands_only",
+    "realismLevel": "high documentary-style photorealism with compassionate editorial polish",
+    "realismCues": [
+      "natural hand posture and non-posed gestures",
+      "subtle material wear (paper grain, leather texture, wood imperfections)",
+      "soft shadow falloff from real window or practical light sources"
+    ],
+    "subjectPriority": "hero subject should feel meaningful and emotionally grounded, occupying 38-52% of the frame",
+    "backgroundPriority": "background should provide lived-in emotional context while keeping a clean low-detail text lane",
+    "lightingApproach": "soft directional natural light with gentle contrast, avoiding harsh dramatic stylization",
+    "compositionApproach": "asymmetric narrative composition with one-third subject bias, no centered tabletop default, and intentional breathing room",
+    "regenerationTriggers": [
+      "scene appears as isolated object on blank/white sterile background",
+      "composition defaults to centered static tabletop symmetry",
+      "human presence policy is violated or feels staged",
+      "text lane has noisy gradients/bokeh that harm readability",
+      "props conflict with narrative moment or audience context"
+    ]
+  }
+}

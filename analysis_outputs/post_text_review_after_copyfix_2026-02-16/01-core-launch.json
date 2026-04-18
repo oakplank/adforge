@@ -1,0 +1,13 @@
+{
+  "id": "01-core-launch",
+  "prompt": "PartingWord.com launch ad for end-of-life messaging platform, compassionate premium tone for adults preparing messages for loved ones, dark green and cream beige.",
+  "screenshotFull": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_after_copyfix_2026-02-16/01-core-launch-full.png",
+  "screenshotCanvas": "/Users/branch/.openclaw/workspace/adforge/analysis_outputs/post_text_review_after_copyfix_2026-02-16/01-core-launch-canvas.png",
+  "text": {
+    "headline": "Messages for the People You Love",
+    "subhead": "Capture guidance, love, and practical notes for the people who matter m…",
+    "cta": "See How It Works"
+  },
+  "templateId": "minimal",
+  "objective": "launch"
+}

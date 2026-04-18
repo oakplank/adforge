@@ -1,0 +1,119 @@
+
+## 2026-02-16 19:33 - US-002: Define brand design tokens and typographic hierarchy types
+- Created `server/src/types/textSystem.ts` with interfaces: TypographyToken, BrandTokenSet, AdIntent, AdIntentPreset, TextHierarchyConfig, SafeZoneSpec
+- Created `server/src/designTokens.ts` with exports: TYPOGRAPHY_SCALE, COLOR_TOKENS, SPACING_TOKENS, SAFE_ZONE_SPECS, AD_INTENT_PRESETS, FONT_SIZE_CLAMPS
+- 3 ad intent presets: conversion (high CTA emphasis), awareness (low CTA), retargeting (medium)
+- All font size clamps: min >= 14, max <= 96
+- Created `server/src/designTokens.test.ts` with tests for all token constraints, WCAG AA contrast, safe zones, presets
+- All 176 tests pass, build passes
+- **Learnings:** types/ subdirectory works fine with existing tsconfig bundler resolution
+---
+
+## 2026-02-16 19:43 - US-003: Build new text sizing engine with dynamic clamps and safe zone enforcement
+- Created `server/src/textSizingEngine.ts` with three exports:
+  - `calculateDynamicFontSize`: binary search for optimal size within token min/max, uses char count + line wrap estimation
+  - `enforceContentSafeZone`: repositions elements into safe bounds for feed/story/reel formats
+  - `constrainLineLength`: word-boundary-aware line breaking
+- Created `server/src/textSizingEngine.test.ts` with 20 test cases across all three functions
+- All 196 server tests pass, typecheck passes
+- **Learnings:** Binary search works well for font sizing with integer px values; SAFE_ZONE_SPECS from designTokens provides format-specific margins
+---
+
+## 2026-02-16 19:53 - US-004: Build reusable CTA module with token-based styling
+- Created `server/src/ctaModule.ts` with `generateCtaConfig(text, brandTokens, intent, format)`
+- Returns full CTA config: text, fontSize, padding, borderRadius, bgColor, textColor, contrastRatio, position, minWidth, minHeight
+- WCAG AA contrast enforcement (>=4.5) with automatic fallback to high-contrast pairs
+- Format-aware sizing: story/reel get larger fonts and padding via scaling factors
+- Minimum 44px touch targets enforced for all formats
+- Text truncation to CHAR_LIMITS.cta (16 chars)
+- Intent-driven emphasis: conversion=high (larger CTA), awareness=low (subtle), retargeting=medium
+- Created `server/src/ctaModule.test.ts` with 60 tests: 9 intent×format combos (6 assertions each) + 4 edge case tests
+- All 256 tests pass, typecheck passes
+- **Learnings:** contrastRatio helper is reusable for any future color accessibility checks
+---
+
+## 2026-02-16 20:23 - US-007: Update copyEngine.ts to support intent-based copy strategy
+- Added `import type { AdIntent }` to copyEngine.ts
+- Added optional `intent?: AdIntent` field to `CopyInput` interface
+- Updated `formulaCandidates()`: intent takes priority over objective/category — retargeting→proof/benefit/question, conversion→urgency/number/benefit, awareness→benefit/curiosity/question
+- Updated `ctaCandidates()`: intent takes priority — retargeting uses dedicated RETARGETING_CTA_CANDIDATES
+- Exported `RETARGETING_CTA_CANDIDATES` with 5 options: Come Back, Still Interested?, Complete Order, Finish Checkout, Return & Save
+- Added conversion and awareness intent-specific CTA lists
+- Added 8 new tests: intent acceptance, retargeting CTAs, retargeting CTA count, formula differentiation between intents, awareness formula verification, conversion CTAs, char limits for all intents, backward compatibility without intent
+- All 285 tests pass, typecheck passes
+---
+
+## 2026-02-16 20:33 - US-008: Wire intent presets into generateAd endpoint
+- Updated `server/src/generateAd.ts`: added `intent` to AdSpec metadata type, `generateAdSpec` signature, endpoint request body parsing
+- Intent is validated against allowed values; invalid values are silently ignored
+- Passes intent through to `generateCopy` and `generateLayout`
+- Added 8 new tests: intent in metadata, backward compat, invalid intent ignored, different copy for retargeting vs conversion, all three intents accepted, generateAdSpec direct tests
+- All 292 tests pass, typecheck passes
+---
+
+## 2026-02-16 21:24 - US-009: Update client-side safe zone types and format constants
+- Updated `client/src/types/safeZones.ts`: added optional topMargin, bottomMargin, rightMargin to SafeZoneConfig; story gets 14% top / 35% bottom; added reel format with 15% right margin
+- Updated `client/src/types/formats.ts`: added reel format (1080x1920)
+- Updated `getSafeZonePixels` to use asymmetric margins when present
+- Created `client/src/types/safeZones.test.ts` (11 tests) and `client/src/types/formats.test.ts` (4 tests)
+- Fixed `client/src/hooks/useGridOverlay.test.ts` and `client/src/components/FormatSelector.test.tsx` for new format count and margins
+- All 221 client tests pass, typecheck passes
+- **Learnings:** Client vitest has globals: true, so import from vitest is optional but explicit is fine
+---
+
+## 2026-02-16 21:33 - US-010: Add brand token styles to client-side layer types
+- Added TokenRole type, BrandTextPreset interface, BRAND_TEXT_PRESETS constant to client/src/types/layers.ts
+- Extended TextStyle with optional tokenRole field
+- DEFAULT_TEXT_STYLE now derives from BRAND_TEXT_PRESETS.headline
+- DEFAULT_CTA_STYLE padding derives from BRAND_TEXT_PRESETS.cta
+- Updated layers.test.ts with 12 tests covering presets, defaults, hierarchy
+- All 231 client tests pass, typecheck passes
+---
+
+## 2026-02-16 22:28 - US-011: Update TypographyControls to show token role selector and constrained sizing
+- Added token role dropdown (headline/subhead/body/custom) to TypographyControls.tsx
+- Role selection auto-applies preset fontFamily, fontWeight, and clamps fontSize to min/max
+- Custom role keeps unconstrained sizing (1-500)
+- Font size input min/max attributes dynamically set based on selected role
+- Added 8 new tests: role dropdown rendering, preset application, size clamping (too large/too small), constrained min/max attributes, custom unconstrained, role clearing
+- All 240 client tests pass, typecheck passes
+- **Learnings:** Client vitest has globals enabled (no explicit imports needed unlike server)
+---
+
+## 2026-02-16 22:38 - US-012: Update CtaControls with token-based defaults and contrast indicator
+- Created `client/src/utils/contrast.ts` with `calculateContrastRatio` (WCAG luminance-based)
+- Updated `client/src/components/CtaControls.tsx`: added text color picker, contrast ratio badge (green/red), paddingX/paddingY controls
+- DEFAULT_CTA_STYLE already uses brand token values (from US-010)
+- Updated `client/src/components/CtaControls.test.tsx`: added 7 new tests for contrast badge, padding controls, text color input
+- Created `client/src/utils/contrast.test.ts`: 4 tests for contrast ratio calculation
+- All 272 client tests pass, typecheck passes
+---
+
+## 2026-02-16 22:49 - US-013: Create before/after example template demonstrating improved text system
+- Created `client/src/types/exampleTemplates.ts` with BEFORE_TEMPLATE and AFTER_TEMPLATE
+- BEFORE: flat sizing (all 32px, weight 400), story text outside safe zones (headline y=60 < 268, CTA y=1400 > 1248)
+- AFTER: clear hierarchy (headline 64px/800w > subhead 28px/400w > CTA 22px/700w), all text within safe zones for all 3 formats
+- Both templates share identical slot structure (6 slots: background, headline, subhead, productImage, cta, logo)
+- Added both to BUILT_IN_TEMPLATES in templates.ts (now 5 templates)
+- Updated templates.test.ts assertions from 3 to 5 templates
+- Created `client/src/types/exampleTemplates.test.ts` with 15 tests: exports, registration, hierarchy, flat sizing, safe zone compliance, safe zone violations, structural parity
+- All 291 client tests pass, all 292 server tests pass, typecheck passes
+- **Learnings:** Story format safe zones use titleSafe=0.14 for left/right (151.2px) — must account for this in x positioning, not just top/bottom
+---
+
+## 2026-02-16 22:59 - US-014: Write style guide documentation and usage examples
+- Created `docs/style-guide.md` with 5 sections: Typography, Safe Zones, CTA, Brand Tokens, Intent Presets
+- Each section has actionable numbered rules (20+ total), tables with token values, and references to source modules
+- Created `docs/usage-examples.md` with 5 code examples: generate ad with intent, use design tokens, create custom preset, validate text placement, generate CTA
+- Created `server/src/docs-validation.test.ts` with 17 tests validating both docs exist, contain required sections, have actionable rules, reference correct values
+- All 309 tests pass, typecheck passes
+---
+
+## 2026-02-16 23:09 - US-015: Integration test and final cleanup: verify full pipeline with new text system
+- Created `server/src/integration.test.ts` with 45 test cases (9 format×intent combos × 5 assertions each)
+- Tests cover: layout generation, safe zone bounds, copy validation, WCAG AA contrast ratios, layout validation
+- All 354 server tests pass, all 291 client tests pass
+- Build passes in both server and client
+- Audited deprecated exports (SAFE_ZONES, FONT_SIZES) — kept as they're referenced in backward-compat tests
+- **Learnings:** Integration tests that generate all combos programmatically via nested loops keep test count high with minimal code
+---

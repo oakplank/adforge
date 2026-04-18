@@ -30,6 +30,10 @@ describe('detectCategory', () => {
   it('returns general for unknown products', () => {
     expect(detectCategory('widget', 'amazing widget')).toBe('general');
   });
+
+  it('does not misclassify "spring" as jewelry "ring"', () => {
+    expect(detectCategory('spring showcase registration', 'athletics training camp')).not.toBe('jewelry');
+  });
 });
 
 describe('detectObjective', () => {
@@ -43,6 +47,10 @@ describe('detectObjective', () => {
 
   it('defaults to awareness objective', () => {
     expect(detectObjective('Premium cookware for everyday kitchens')).toBe('awareness');
+  });
+
+  it('does not treat words like "offers" as discount intent', () => {
+    expect(detectObjective('This platform offers elite coaching for athletes')).toBe('awareness');
   });
 });
 
@@ -138,7 +146,7 @@ describe('buildPromptPipeline', () => {
     expect(result.agenticPlan.postImageChecklist.length).toBeGreaterThan(0);
   });
 
-  it('applies PartingWord brand context, palette, and right-lane placement bias', () => {
+  it('applies PartingWord brand context, palette, and adaptive lane placement guidance', () => {
     const result = buildPromptPipeline({
       rawPrompt: 'PartingWord.com end of life messaging platform, calm trustworthy tone',
       product: 'end of life messaging platform',
@@ -152,11 +160,13 @@ describe('buildPromptPipeline', () => {
     expect(result.promptPipeline.renderPrompt).toContain('#1E4D3A');
     expect(result.promptPipeline.renderPrompt).toContain('#F1E9DA');
     expect(result.promptPipeline.systemPrompt).toContain('empathetic');
-    expect(result.placementHints.preferredAlignment).toBe('right');
+    expect(result.placementHints.preferredAlignment).toBe('auto');
     expect(result.placementHints.avoidCenter).toBe(true);
     expect(result.suggestedTemplateId).toBe('minimal');
-    expect(result.promptPipeline.renderPrompt).toContain('right 45%');
+    expect(result.promptPipeline.renderPrompt).toContain('outer 30-40%');
+    expect(result.promptPipeline.renderPrompt).toContain('left or right');
     expect(result.promptPipeline.renderPrompt).toContain('Do not render tablets, phones, laptops');
+    expect(result.promptPipeline.renderPrompt).toContain('Do not fabricate gradient rows, columns');
     expect(result.promptPipeline.renderPrompt).toContain('one primary anchor object');
     expect(result.promptPipeline.systemPrompt).toContain('narrative logic');
     expect(result.promptPipeline.systemPrompt).toContain('silent pre-render thought session');
