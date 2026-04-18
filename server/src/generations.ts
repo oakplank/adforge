@@ -16,6 +16,26 @@ function isSafeHttpUrl(value: string): boolean {
   }
 }
 
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+const BASE64_SHAPE = /^[A-Za-z0-9+/]+={0,2}$/;
+
+// Reject anything that isn't plausibly base64, and anything whose decoded
+// size would exceed our on-disk ceiling. Buffer.from silently drops invalid
+// chars, so we have to screen the input ourselves.
+function validateBase64Image(value: string): { ok: true } | { ok: false; error: string } {
+  if (value.length === 0) return { ok: false, error: 'imageBase64 is empty' };
+  if (value.length % 4 !== 0) return { ok: false, error: 'imageBase64 is malformed' };
+  if (!BASE64_SHAPE.test(value)) return { ok: false, error: 'imageBase64 contains non-base64 characters' };
+
+  // 4 base64 chars encode 3 bytes; subtract padding.
+  const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0;
+  const decodedBytes = (value.length / 4) * 3 - padding;
+  if (decodedBytes > MAX_IMAGE_BYTES) {
+    return { ok: false, error: `imageBase64 exceeds ${MAX_IMAGE_BYTES} bytes` };
+  }
+  return { ok: true };
+}
+
 export function createGenerationsRouter(store?: GenerationsStore): Router {
   const router = Router();
   const generationsStore = store ?? new GenerationsStore();
@@ -70,6 +90,19 @@ export function createGenerationsRouter(store?: GenerationsStore): Router {
     if (!imageBase64 && !imageUrl) {
       res.status(400).json({ error: 'Missing image payload' });
       return;
+    }
+
+    if (imageBase64 !== undefined && typeof imageBase64 !== 'string') {
+      res.status(400).json({ error: 'imageBase64 must be a string' });
+      return;
+    }
+
+    if (typeof imageBase64 === 'string') {
+      const check = validateBase64Image(imageBase64);
+      if (!check.ok) {
+        res.status(400).json({ error: check.error });
+        return;
+      }
     }
 
     if (!imageBase64 && typeof imageUrl === 'string' && !isSafeHttpUrl(imageUrl)) {

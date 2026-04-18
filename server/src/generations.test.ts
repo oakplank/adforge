@@ -109,6 +109,21 @@ describe('Generations API', () => {
     ]);
   });
 
+  it('rejects imageBase64 containing non-base64 characters', async () => {
+    const { app } = await createTestApp();
+
+    const res = await request(app).post('/api/generations').send({
+      prompt: 'bad b64',
+      format: 'square',
+      imagePrompt: 'prompt',
+      adSpec: { templateId: 'bold-sale' },
+      imageBase64: 'not!!valid$$$base64',
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('imageBase64');
+  });
+
   it('rejects imageUrl with a non-http(s) scheme', async () => {
     const { app } = await createTestApp();
 
