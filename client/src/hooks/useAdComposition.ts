@@ -6,7 +6,7 @@ import { useLayerStore } from '../store/layerStore';
 import type { TextStyle } from '../types/layers';
 import type { PlacementPlan, PlacementTextBlock, PlacementCtaBlock } from '../utils/imagePlacementAnalyzer';
 
-export interface ComposeOptions {
+interface ComposeOptions {
   canvas: Canvas | null;
   formatId: string;
   canvasWidth: number;

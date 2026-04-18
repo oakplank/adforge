@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { Canvas } from 'fabric';
 
-export interface UseCanvasOptions {
+interface UseCanvasOptions {
   width?: number;
   height?: number;
 }

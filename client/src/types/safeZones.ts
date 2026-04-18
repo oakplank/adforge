@@ -1,4 +1,4 @@
-export interface SafeZoneConfig {
+interface SafeZoneConfig {
   /** Title safe zone margin as percentage of dimension */
   titleSafe: number;
   /** Action safe zone margin as percentage of dimension */
@@ -6,7 +6,7 @@ export interface SafeZoneConfig {
 }
 
 /** Safe zone configs per format - margins as fraction of canvas size */
-export const SAFE_ZONES: Record<string, SafeZoneConfig> = {
+const SAFE_ZONES: Record<string, SafeZoneConfig> = {
   square: { titleSafe: 0.1, actionSafe: 0.05 },
   portrait: { titleSafe: 0.1, actionSafe: 0.05 },
   story: { titleSafe: 0.15, actionSafe: 0.05 },

@@ -3,7 +3,7 @@ import { useFormat } from '../context/FormatContext';
 import { useGeneration } from '../hooks/useGeneration';
 import { useGenerationState } from '../context/GenerationContext';
 
-export interface PromptBarProps {
+interface PromptBarProps {
   onGenerated?: (result: NonNullable<ReturnType<typeof useGeneration>['result']>) => void;
 }
 

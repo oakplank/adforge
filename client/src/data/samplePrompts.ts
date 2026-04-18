@@ -1,7 +1,7 @@
 /**
  * Sample prompts that users can click to try the app
  */
-export interface SamplePrompt {
+interface SamplePrompt {
   id: string;
   prompt: string;
   category: string;

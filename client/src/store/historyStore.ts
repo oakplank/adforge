@@ -6,7 +6,7 @@ export interface HistoryEntry {
   selectedLayerId: string | null;
 }
 
-export interface HistoryStore {
+interface HistoryStore {
   past: HistoryEntry[];
   future: HistoryEntry[];
   maxHistory: number;

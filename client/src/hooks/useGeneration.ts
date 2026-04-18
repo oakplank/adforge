@@ -65,7 +65,7 @@ export interface GenerationResult {
   imageBase64?: string;
 }
 
-export interface UseGenerationReturn {
+interface UseGenerationReturn {
   isGenerating: boolean;
   error: string | null;
   result: GenerationResult | null;

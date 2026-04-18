@@ -5,7 +5,7 @@ import type { FabricObject } from 'fabric';
 
 let nextId = 1;
 
-export interface LayerStore {
+interface LayerStore {
   layers: Layer[];
   selectedLayerId: string | null;
 

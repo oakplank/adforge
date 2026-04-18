@@ -14,7 +14,7 @@ import type { Canvas } from 'fabric';
 import type { ShapeKind } from '../types/shapes';
 import type { Layer } from '../types/layers';
 
-export interface CanvasEditorProps {
+interface CanvasEditorProps {
   width?: number;
   height?: number;
   onCanvasReady?: (canvas: Canvas) => void;
