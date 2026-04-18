@@ -252,7 +252,10 @@ function buildRenderPrompt(input: {
 
   return normalizeWhitespace(
     [
-      `Premium Instagram ad image, ${formatConfig.aspectRatio} aspect ratio.`,
+      `Premium Instagram ad image, ${formatConfig.aspectRatio} aspect ratio, ${formatConfig.width}x${formatConfig.height}.`,
+      // Gemini 3 Pro Image has a tendency to letterbox/pillarbox when the
+      // prompt reads as "cinematic." Explicit edge-to-edge guard blocks that.
+      `Fill the entire ${formatConfig.aspectRatio} frame edge-to-edge with photographic content; absolutely no letterbox bars, pillarbox bars, matte borders, vignette frames, or solid color margins of any kind.`,
       `Subject: ${product}.`,
       `Brief from the user: "${userIntent}"`,
       audienceClause,

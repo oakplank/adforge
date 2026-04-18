@@ -5,6 +5,7 @@ import { getTemplateById, mapTemplateToFormat, type MappedSlot } from '../types/
 import { useLayerStore } from '../store/layerStore';
 import type { TextStyle } from '../types/layers';
 import type { PlacementPlan, PlacementOverlays, PlacementTextBlock, PlacementCtaBlock } from '../utils/imagePlacementAnalyzer';
+import { trimLetterbox } from '../utils/trimLetterbox';
 
 interface ComposeOptions {
   canvas: Canvas | null;
@@ -370,7 +371,12 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
 
       if (imgSrc) {
         try {
-          const img = await FabricImage.fromURL(imgSrc);
+          // Gemini occasionally returns letterboxed/pillarboxed canvases even
+          // with aspectRatio hinting. Crop solid bars before the cover fit so
+          // the subject actually fills the frame instead of being shrunk.
+          const trimResult = await trimLetterbox(imgSrc).catch(() => null);
+          const finalSrc = trimResult?.trimmed ? trimResult.src : imgSrc;
+          const img = await FabricImage.fromURL(finalSrc);
           placeCoverImage(img, canvasWidth, canvasHeight, preferredAlignment);
           canvas.add(img);
           addLayer({ type: 'background', name: 'Background Image', fabricObject: img });
