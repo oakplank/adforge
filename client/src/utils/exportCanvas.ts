@@ -1,4 +1,4 @@
-import type { Canvas } from 'fabric';
+import type { Canvas, FabricObject } from 'fabric';
 
 export type ExportFormat = 'png' | 'jpg';
 export type ExportScale = 1 | 2;
@@ -15,6 +15,15 @@ export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   scale: 1,
 };
 
+type OverlayTaggedObject = FabricObject & {
+  data?: { isOverlay?: boolean; isSafeZone?: boolean; isGrid?: boolean };
+};
+
+function isOverlay(obj: FabricObject): obj is OverlayTaggedObject {
+  const data = (obj as OverlayTaggedObject).data;
+  return Boolean(data?.isOverlay || data?.isSafeZone || data?.isGrid);
+}
+
 export function generateExportFilename(format: ExportFormat, timestamp?: number): string {
   const ts = timestamp ?? Date.now();
   const ext = format === 'jpg' ? 'jpg' : 'png';
@@ -26,10 +35,8 @@ export function exportCanvasToDataURL(
   options: ExportOptions,
 ): string {
   // Hide overlay objects (grid, safe zones) before export
-  const overlayObjects = canvas.getObjects().filter(
-    (obj: any) => obj.data?.isOverlay || obj.data?.isSafeZone || obj.data?.isGrid,
-  );
-  overlayObjects.forEach((obj: any) => {
+  const overlayObjects = canvas.getObjects().filter(isOverlay);
+  overlayObjects.forEach((obj) => {
     obj.visible = false;
   });
 
@@ -45,7 +52,7 @@ export function exportCanvasToDataURL(
   });
 
   // Restore overlay objects
-  overlayObjects.forEach((obj: any) => {
+  overlayObjects.forEach((obj) => {
     obj.visible = true;
   });
   canvas.renderAll();
