@@ -1,3 +1,4 @@
+import type { Canvas, Rect } from 'fabric';
 import { useLayerStore } from '../store/layerStore';
 import type { ShapeStyle } from '../types/shapes';
 
@@ -17,18 +18,19 @@ export function ShapeControls() {
     if (!selectedLayerId) return;
     updateShapeStyle(selectedLayerId, partial);
 
-    // Sync to fabric object
     const obj = layer.fabricObject;
     if (obj && typeof obj.set === 'function') {
       if (partial.fill !== undefined) obj.set('fill', partial.fill);
       if (partial.stroke !== undefined) obj.set('stroke', partial.stroke);
       if (partial.strokeWidth !== undefined) obj.set('strokeWidth', partial.strokeWidth);
-      if (partial.cornerRadius !== undefined) {
-        obj.set('rx' as any, partial.cornerRadius);
-        obj.set('ry' as any, partial.cornerRadius);
+      if (partial.cornerRadius !== undefined && obj.type === 'rect') {
+        const rect = obj as Rect;
+        rect.set('rx', partial.cornerRadius);
+        rect.set('ry', partial.cornerRadius);
       }
-      if (obj.canvas && typeof obj.canvas.requestRenderAll === 'function') {
-        obj.canvas.requestRenderAll();
+      const parentCanvas = obj.canvas as Canvas | undefined;
+      if (parentCanvas && typeof parentCanvas.requestRenderAll === 'function') {
+        parentCanvas.requestRenderAll();
       }
     }
   };
