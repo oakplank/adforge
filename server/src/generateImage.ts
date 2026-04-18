@@ -103,7 +103,7 @@ export function createGenerateImageRouter(client?: NanoBananaClient): Router {
 
   const imageClient = client ?? (() => {
     const apiKey = process.env.NANO_BANANA_API_KEY;
-    if (!apiKey) {
+    if (!apiKey && process.env.NODE_ENV !== 'test') {
       console.warn('NANO_BANANA_API_KEY not set - image generation will fail');
     }
     return new NanoBananaClient(apiKey ?? '');
