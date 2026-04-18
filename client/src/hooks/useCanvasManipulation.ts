@@ -112,19 +112,19 @@ export function useCanvasManipulation(canvas: Canvas | null) {
 
     if (typeof canvas.on !== 'function') return;
 
-    canvas.on('object:added', onObjectAdded as any);
-    canvas.on('object:moving', onObjectMoving as any);
-    canvas.on('object:modified', onObjectModified as any);
-    canvas.on('selection:created', onSelectionCreated as any);
-    canvas.on('selection:updated', onSelectionCreated as any);
+    canvas.on('object:added', onObjectAdded);
+    canvas.on('object:moving', onObjectMoving);
+    canvas.on('object:modified', onObjectModified);
+    canvas.on('selection:created', onSelectionCreated);
+    canvas.on('selection:updated', onSelectionCreated);
     canvas.on('selection:cleared', onSelectionCleared);
 
     return () => {
-      canvas.off('object:added', onObjectAdded as any);
-      canvas.off('object:moving', onObjectMoving as any);
-      canvas.off('object:modified', onObjectModified as any);
-      canvas.off('selection:created', onSelectionCreated as any);
-      canvas.off('selection:updated', onSelectionCreated as any);
+      canvas.off('object:added', onObjectAdded);
+      canvas.off('object:moving', onObjectMoving);
+      canvas.off('object:modified', onObjectModified);
+      canvas.off('selection:created', onSelectionCreated);
+      canvas.off('selection:updated', onSelectionCreated);
       canvas.off('selection:cleared', onSelectionCleared);
     };
   }, [canvas, configureCanvas, configureObject, syncTransform, applySnapping, selectLayer]);
