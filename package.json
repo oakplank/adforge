@@ -14,6 +14,7 @@
     "typecheck:server": "npm run typecheck --prefix server",
     "typecheck:client": "npm run typecheck --prefix client",
     "build": "npm run build --prefix server && npm run build --prefix client",
-    "dev:client": "npm run dev --prefix client"
+    "dev:client": "npm run dev --prefix client",
+    "lint:dead": "npx --yes knip"
   }
 }
