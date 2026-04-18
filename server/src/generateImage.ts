@@ -4,6 +4,7 @@ import { Router, Request, Response } from 'express';
 const rateLimitMap = new Map<string, number[]>();
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_SWEEP_THRESHOLD = 512;
 const DEFAULT_IMAGE_MODEL = 'gemini-3-pro-image-preview';
 
 interface GeminiInlineData {
@@ -24,8 +25,24 @@ interface GeminiResponse {
   candidates?: GeminiCandidate[];
 }
 
+function sweepStaleRateLimitEntries(now: number): void {
+  for (const [key, timestamps] of rateLimitMap) {
+    const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+    if (recent.length === 0) {
+      rateLimitMap.delete(key);
+    } else if (recent.length !== timestamps.length) {
+      rateLimitMap.set(key, recent);
+    }
+  }
+}
+
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
+
+  if (rateLimitMap.size >= RATE_LIMIT_SWEEP_THRESHOLD) {
+    sweepStaleRateLimitEntries(now);
+  }
+
   const timestamps = rateLimitMap.get(ip) ?? [];
   const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
   if (recent.length >= RATE_LIMIT_MAX) return false;
