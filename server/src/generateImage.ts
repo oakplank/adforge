@@ -6,6 +6,24 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 10;
 const DEFAULT_IMAGE_MODEL = 'gemini-3-pro-image-preview';
 
+interface GeminiInlineData {
+  mimeType?: string;
+  data: string;
+}
+
+interface GeminiPart {
+  inlineData?: GeminiInlineData;
+  text?: string;
+}
+
+interface GeminiCandidate {
+  content?: { parts?: GeminiPart[] };
+}
+
+interface GeminiResponse {
+  candidates?: GeminiCandidate[];
+}
+
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
   const timestamps = rateLimitMap.get(ip) ?? [];
@@ -75,7 +93,7 @@ export class NanoBananaClient {
         throw new Error(`Gemini API returned ${response.status}: ${text}`);
       }
 
-      const data = await response.json() as any;
+      const data = (await response.json()) as GeminiResponse;
       const candidates = data.candidates;
       if (!candidates || candidates.length === 0) {
         throw new Error('No candidates in Gemini response');
