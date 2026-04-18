@@ -63,6 +63,7 @@ export interface GenerationResult {
   adSpec: AdSpec;
   imageUrl?: string;
   imageBase64?: string;
+  mimeType?: string;
 }
 
 interface UseGenerationReturn {
@@ -205,7 +206,10 @@ export function useGeneration(): UseGenerationReturn {
       }
 
       const imgData = await imgRes.json();
-      const imageSrc = imgData.imageBase64 ? `data:image/png;base64,${imgData.imageBase64}` : imgData.imageUrl;
+      const imgMimeType = typeof imgData.mimeType === 'string' ? imgData.mimeType : 'image/png';
+      const imageSrc = imgData.imageBase64
+        ? `data:${imgMimeType};base64,${imgData.imageBase64}`
+        : imgData.imageUrl;
 
       if (imageSrc && imageSrc.startsWith('data:')) {
         const placementPlan = await analyzeWithTimeout(imageSrc, toPlacementHints(adSpec, format));
@@ -221,6 +225,7 @@ export function useGeneration(): UseGenerationReturn {
         adSpec,
         imageUrl: imgData.imageUrl,
         imageBase64: imgData.imageBase64,
+        mimeType: imgData.imageBase64 ? imgMimeType : undefined,
       };
 
       setResult(genResult);

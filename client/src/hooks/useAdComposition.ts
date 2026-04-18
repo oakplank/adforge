@@ -255,7 +255,7 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
     canvas.clear();
     setLayers([]);
 
-    const { adSpec, imageUrl, imageBase64 } = result;
+    const { adSpec, imageUrl, imageBase64, mimeType } = result;
     const template = getTemplateById(adSpec.templateId) || getTemplateById('bold-sale');
     if (!template) return;
 
@@ -267,7 +267,9 @@ export function useAdComposition({ canvas, formatId, canvasWidth, canvasHeight }
 
     const bgSlot = slots.find((s) => s.type === 'background');
     if (bgSlot) {
-      const imgSrc = imageBase64 ? `data:image/png;base64,${imageBase64}` : imageUrl || '';
+      const imgSrc = imageBase64
+        ? `data:${mimeType || 'image/png'};base64,${imageBase64}`
+        : imageUrl || '';
 
       if (imgSrc) {
         try {
