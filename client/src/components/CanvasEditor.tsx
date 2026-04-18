@@ -75,10 +75,10 @@ export function CanvasEditor({ width = 1080, height = 1080, onCanvasReady }: Can
   const handleDuplicateSelected = useCallback(async () => {
     if (!canvas || !selectedLayerId) return;
     const layer = useLayerStore.getState().layers.find((entry) => entry.id === selectedLayerId);
-    if (!layer?.fabricObject || typeof (layer.fabricObject as any).clone !== 'function') return;
+    if (!layer?.fabricObject || typeof layer.fabricObject.clone !== 'function') return;
 
     saveHistory();
-    const cloned = await (layer.fabricObject as any).clone();
+    const cloned = await layer.fabricObject.clone();
     const nextLeft = (cloned.left ?? 0) + 28;
     const nextTop = (cloned.top ?? 0) + 28;
     cloned.set({

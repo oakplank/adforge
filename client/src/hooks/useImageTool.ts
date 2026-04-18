@@ -49,7 +49,7 @@ export function useImageTool(canvas: Canvas | null) {
           if (typeof fabricImg.setControlsVisibility === 'function') {
             fabricImg.setControlsVisibility({ mb: false, mt: false, ml: false, mr: false });
           }
-          (fabricImg as any).lockUniScaling = true;
+          (fabricImg as FabricImage & { lockUniScaling?: boolean }).lockUniScaling = true;
 
           canvas.add(fabricImg);
           canvas.setActiveObject(fabricImg);
