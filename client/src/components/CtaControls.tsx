@@ -1,6 +1,11 @@
+import type { Canvas, FabricObject, Group, Rect, IText } from 'fabric';
 import { useLayerStore } from '../store/layerStore';
 import { DEFAULT_CTA_STYLE } from '../types/layers';
 import type { CtaStyle } from '../types/layers';
+
+function isGroup(obj: FabricObject | null): obj is Group {
+  return obj !== null && typeof (obj as Group).getObjects === 'function';
+}
 
 export function CtaControls() {
   const selectedLayerId = useLayerStore((s) => s.selectedLayerId);
@@ -16,29 +21,29 @@ export function CtaControls() {
     if (!selectedLayerId) return;
     updateCtaStyle(selectedLayerId, { [field]: value });
 
-    // Sync to fabric group
     const group = selectedLayer.fabricObject;
-    if (group && typeof (group as any).getObjects === 'function') {
-      const objects = (group as any).getObjects();
-      const rect = objects.find((o: any) => o.type === 'rect');
-      const text = objects.find((o: any) => o.type === 'i-text' || o.type === 'text');
+    if (isGroup(group)) {
+      const objects = group.getObjects();
+      const rect = objects.find((o) => o.type === 'rect') as Rect | undefined;
+      const text = objects.find((o) => o.type === 'i-text' || o.type === 'text') as IText | undefined;
 
-      if (field === 'buttonColor' && rect && typeof rect.set === 'function') {
+      if (field === 'buttonColor' && rect) {
         rect.set('fill', value);
       }
-      if (field === 'textContent' && text && typeof text.set === 'function') {
+      if (field === 'textContent' && text) {
         text.set('text', value);
       }
-      if (field === 'textColor' && text && typeof text.set === 'function') {
+      if (field === 'textColor' && text) {
         text.set('fill', value);
       }
-      if (field === 'cornerRadius' && rect && typeof rect.set === 'function') {
+      if (field === 'cornerRadius' && rect) {
         rect.set('rx', value);
         rect.set('ry', value);
       }
 
-      if (group.canvas && typeof group.canvas.requestRenderAll === 'function') {
-        group.canvas.requestRenderAll();
+      const parentCanvas = group.canvas as Canvas | undefined;
+      if (parentCanvas && typeof parentCanvas.requestRenderAll === 'function') {
+        parentCanvas.requestRenderAll();
       }
     }
   };
