@@ -120,7 +120,6 @@ export function generateLayout(
   const safeZone = SAFE_ZONES[format as keyof typeof SAFE_ZONES] || SAFE_ZONES.square;
 
   const safeTop = height * safeZone.top;
-  const safeBottom = height * (1 - safeZone.bottom);
   const contentWidth = width * 0.8;
   const contentX = width * 0.1;
 

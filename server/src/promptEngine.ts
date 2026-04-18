@@ -213,7 +213,7 @@ function derivePlacementHints(objective: Objective, vibe: string, brand?: BrandP
   };
 }
 
-function deriveIntent(description: string, objective: Objective, brand?: BrandProfile): string {
+function deriveIntent(_description: string, objective: Objective, brand?: BrandProfile): string {
   if (brand?.id === 'partingword') {
     return 'help people preserve meaningful words for loved ones with dignity and calm trust';
   }
