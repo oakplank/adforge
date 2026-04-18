@@ -155,12 +155,14 @@ export function createGenerateImageRouter(client?: NanoBananaClient): Router {
       const result = await imageClient.generateImage(prompt.trim(), w, h, ep, sp, selectedModel);
 
       if (result.startsWith('data:')) {
-        const base64 = result.split(',')[1];
-        res.json({ imageBase64: base64, mimeType: 'image/png', model: selectedModel ?? DEFAULT_IMAGE_MODEL });
+        const match = /^data:([^;]+);base64,(.+)$/.exec(result);
+        const mimeType = match?.[1] ?? 'image/png';
+        const base64 = match?.[2] ?? result.split(',')[1] ?? '';
+        res.json({ imageBase64: base64, mimeType, model: selectedModel ?? DEFAULT_IMAGE_MODEL });
       } else if (result.startsWith('http')) {
         res.json({ imageUrl: result, model: selectedModel ?? DEFAULT_IMAGE_MODEL });
       } else {
-        res.json({ imageBase64: result, model: selectedModel ?? DEFAULT_IMAGE_MODEL });
+        res.json({ imageBase64: result, mimeType: 'image/png', model: selectedModel ?? DEFAULT_IMAGE_MODEL });
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Image generation failed';

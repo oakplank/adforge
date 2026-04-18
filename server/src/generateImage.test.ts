@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
+import express from 'express';
 import app from './app.js';
-import { NanoBananaClient } from './generateImage.js';
+import { NanoBananaClient, createGenerateImageRouter } from './generateImage.js';
 
 describe('NanoBananaClient', () => {
   const originalFetch = globalThis.fetch;
@@ -127,6 +128,25 @@ describe('NanoBananaClient', () => {
     await expect(client.generateImage('prompt', 512, 512)).rejects.toThrow('No candidates');
   });
 
+  it('preserves non-png mime types in returned data URL', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        candidates: [{
+          content: {
+            parts: [{ inlineData: { mimeType: 'image/jpeg', data: 'jpegdata' } }],
+          },
+        }],
+      }),
+    });
+    globalThis.fetch = mockFetch;
+
+    const client = new NanoBananaClient('key');
+    const result = await client.generateImage('prompt', 512, 512);
+
+    expect(result).toBe('data:image/jpeg;base64,jpegdata');
+  });
+
   it('throws error when response has no image data', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -174,5 +194,22 @@ describe('POST /api/generate-image', () => {
       .post('/api/generate-image')
       .send({ prompt: 'test', width: -100 });
     expect(res.status).toBe(400);
+  });
+
+  it('forwards the actual mimeType returned by the client', async () => {
+    const stubClient = {
+      generateImage: async () => 'data:image/jpeg;base64,jpegbytes',
+    } as unknown as NanoBananaClient;
+    const testApp = express();
+    testApp.use(express.json());
+    testApp.use(createGenerateImageRouter(stubClient));
+
+    const res = await request(testApp)
+      .post('/api/generate-image')
+      .send({ prompt: 'test', width: 512, height: 512 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.imageBase64).toBe('jpegbytes');
+    expect(res.body.mimeType).toBe('image/jpeg');
   });
 });
