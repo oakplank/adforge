@@ -165,6 +165,17 @@ describe('POST /api/generate-ad', () => {
     expect(res.body.metadata.formatConfig.height).toBe(1350);
   });
 
+  it('ignores non-string format and templateId instead of passing them through', async () => {
+    const res = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'cool shoes', format: 123, templateId: { evil: true } });
+
+    expect(res.status).toBe(200);
+    // Falls back to the square default when format is not a valid string.
+    expect(res.body.metadata.formatConfig.aspectRatio).toBe('1:1');
+    expect(typeof res.body.templateId).toBe('string');
+  });
+
   it('returns full strategy metadata for downstream placement', async () => {
     const res = await request(app)
       .post('/api/generate-ad')

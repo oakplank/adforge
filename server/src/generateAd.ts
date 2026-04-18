@@ -226,16 +226,25 @@ export function createGenerateAdRouter(): Router {
   const router = Router();
 
   router.post('/api/generate-ad', (req: Request, res: Response) => {
-    const { prompt, format, templateId } = req.body;
+    const { prompt, format, templateId } = req.body ?? {};
 
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
       res.status(400).json({ error: 'Missing or invalid prompt' });
       return;
     }
 
-    const parsed = parsePrompt(prompt.trim());
-    const adSpec = generateAdSpec(parsed, format, templateId);
-    res.json(adSpec);
+    const safeFormat = typeof format === 'string' && format.trim().length > 0 ? format.trim() : undefined;
+    const safeTemplateId = typeof templateId === 'string' && templateId.trim().length > 0 ? templateId.trim() : undefined;
+
+    try {
+      const parsed = parsePrompt(prompt.trim());
+      const adSpec = generateAdSpec(parsed, safeFormat, safeTemplateId);
+      res.json(adSpec);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to generate ad spec';
+      console.error('generate-ad error:', message);
+      res.status(500).json({ error: 'Failed to generate ad spec' });
+    }
   });
 
   return router;
