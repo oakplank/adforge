@@ -16,7 +16,7 @@ npm run install:all    # installs both workspaces
 npm run dev:client     # starts Vite (proxies /api to localhost:3001)
 ```
 
-Run the server separately (`cd server && npm run build && node dist/index.js`) — it expects `NANO_BANANA_API_KEY` in the environment for real image generation.
+Run the server separately (`cd server && npm run build && node dist/index.js`). Copy [`server/.env.example`](server/.env.example) to `server/.env` and fill in `NANO_BANANA_API_KEY` (Google AI Studio) for real image generation.
 
 ## Quality gates
 
