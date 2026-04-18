@@ -3,7 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "echo 'No build configured yet'",
-    "test": "echo 'No tests configured yet'"
+    "install:all": "npm install --prefix server && npm install --prefix client",
+    "test": "npm test --prefix server && npm test --prefix client",
+    "test:server": "npm test --prefix server",
+    "test:client": "npm test --prefix client",
+    "typecheck": "npm run typecheck --prefix server && npm run typecheck --prefix client",
+    "typecheck:server": "npm run typecheck --prefix server",
+    "typecheck:client": "npm run typecheck --prefix client",
+    "build": "npm run build --prefix server && npm run build --prefix client",
+    "dev:client": "npm run dev --prefix client"
   }
 }

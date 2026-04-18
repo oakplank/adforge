@@ -69,10 +69,14 @@ describe('useBackgroundTool', () => {
     const { result } = renderHook(() => useBackgroundTool(canvas));
 
     act(() => { result.current.addBackground(); });
-    useLayerStore.getState().addLayer({ type: 'shape', name: 'Rect', fabricObject: null });
+    act(() => {
+      useLayerStore.getState().addLayer({ type: 'shape', name: 'Rect', fabricObject: null });
+    });
 
     const bgId = useLayerStore.getState().layers[0].id;
-    useLayerStore.getState().moveLayer(bgId, 'up');
+    act(() => {
+      useLayerStore.getState().moveLayer(bgId, 'up');
+    });
 
     // Background should still be at index 0
     expect(useLayerStore.getState().layers[0].type).toBe('background');

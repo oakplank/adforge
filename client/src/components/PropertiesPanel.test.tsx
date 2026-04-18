@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import { PropertiesPanel } from './PropertiesPanel';
 import { useLayerStore } from '../store/layerStore';
 
@@ -125,8 +125,10 @@ describe('PropertiesPanel', () => {
     expect(screen.getByTestId('prop-x')).toHaveValue(10);
 
     // Simulate canvas updating the store (as useCanvasManipulation does)
-    useLayerStore.getState().updateLayerTransform('l1', {
-      left: 77, top: 88, width: 100, height: 50, scaleX: 1, scaleY: 1, angle: 0,
+    act(() => {
+      useLayerStore.getState().updateLayerTransform('l1', {
+        left: 77, top: 88, width: 100, height: 50, scaleX: 1, scaleY: 1, angle: 0,
+      });
     });
 
     rerender(<PropertiesPanel />);
