@@ -2,14 +2,11 @@ import { useEffect, useRef } from 'react';
 import * as fabric from 'fabric';
 import { getSafeZonePixels } from '../types/safeZones';
 
-const OVERLAY_PREFIX = '__overlay_';
+type OverlayData = { isOverlay: true; kind: 'grid' | 'safeZone' };
+type OverlayTaggedObject = fabric.FabricObject & { data?: OverlayData };
 
-function removeOverlays(canvas: fabric.Canvas) {
-  const toRemove = canvas.getObjects().filter((o: any) => o.name?.startsWith(OVERLAY_PREFIX));
-  toRemove.forEach((o) => canvas.remove(o));
-}
-
-function makeNonInteractive(obj: fabric.FabricObject) {
+function tagOverlay(obj: fabric.FabricObject, kind: OverlayData['kind']) {
+  (obj as OverlayTaggedObject).data = { isOverlay: true, kind };
   obj.set({
     selectable: false,
     evented: false,
@@ -17,22 +14,27 @@ function makeNonInteractive(obj: fabric.FabricObject) {
   });
 }
 
+function isOverlayObject(obj: fabric.FabricObject): boolean {
+  return Boolean((obj as OverlayTaggedObject).data?.isOverlay);
+}
+
+function removeOverlays(canvas: fabric.Canvas) {
+  const toRemove = canvas.getObjects().filter(isOverlayObject);
+  toRemove.forEach((o) => canvas.remove(o));
+}
+
 function createGridLines(width: number, height: number): fabric.FabricObject[] {
   const lines: fabric.FabricObject[] = [];
   const strokeOpts = { stroke: 'rgba(255,255,255,0.3)', strokeWidth: 1, strokeDashArray: [5, 5] };
 
-  // Vertical lines at 1/3 and 2/3
   for (const frac of [1 / 3, 2 / 3]) {
     const line = new fabric.Line([width * frac, 0, width * frac, height], strokeOpts);
-    (line as any).name = OVERLAY_PREFIX + 'grid_v_' + frac;
-    makeNonInteractive(line);
+    tagOverlay(line, 'grid');
     lines.push(line);
   }
-  // Horizontal lines at 1/3 and 2/3
   for (const frac of [1 / 3, 2 / 3]) {
     const line = new fabric.Line([0, height * frac, width, height * frac], strokeOpts);
-    (line as any).name = OVERLAY_PREFIX + 'grid_h_' + frac;
-    makeNonInteractive(line);
+    tagOverlay(line, 'grid');
     lines.push(line);
   }
   return lines;
@@ -42,7 +44,6 @@ function createSafeZoneRects(formatId: string, width: number, height: number): f
   const zones = getSafeZonePixels(formatId, width, height);
   const rects: fabric.FabricObject[] = [];
 
-  // Title safe
   const ts = zones.titleSafe;
   const titleRect = new fabric.Rect({
     left: ts.left,
@@ -54,11 +55,9 @@ function createSafeZoneRects(formatId: string, width: number, height: number): f
     strokeWidth: 1,
     strokeDashArray: [8, 4],
   });
-  (titleRect as any).name = OVERLAY_PREFIX + 'safe_title';
-  makeNonInteractive(titleRect);
+  tagOverlay(titleRect, 'safeZone');
   rects.push(titleRect);
 
-  // Action safe
   const as_ = zones.actionSafe;
   const actionRect = new fabric.Rect({
     left: as_.left,
@@ -70,8 +69,7 @@ function createSafeZoneRects(formatId: string, width: number, height: number): f
     strokeWidth: 1,
     strokeDashArray: [4, 4],
   });
-  (actionRect as any).name = OVERLAY_PREFIX + 'safe_action';
-  makeNonInteractive(actionRect);
+  tagOverlay(actionRect, 'safeZone');
   rects.push(actionRect);
 
   return rects;
@@ -90,15 +88,12 @@ export function useGridOverlay(
   useEffect(() => {
     if (!canvas) return;
 
-    // Remove existing overlays
     removeOverlays(canvas);
 
-    // Add grid
     if (showGrid) {
       createGridLines(width, height).forEach((obj) => canvas.add(obj));
     }
 
-    // Add safe zones
     if (showSafeZones) {
       createSafeZoneRects(formatId, width, height).forEach((obj) => canvas.add(obj));
     }

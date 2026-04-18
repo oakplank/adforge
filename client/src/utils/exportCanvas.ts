@@ -16,12 +16,11 @@ export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
 };
 
 type OverlayTaggedObject = FabricObject & {
-  data?: { isOverlay?: boolean; isSafeZone?: boolean; isGrid?: boolean };
+  data?: { isOverlay?: boolean };
 };
 
 function isOverlay(obj: FabricObject): obj is OverlayTaggedObject {
-  const data = (obj as OverlayTaggedObject).data;
-  return Boolean(data?.isOverlay || data?.isSafeZone || data?.isGrid);
+  return Boolean((obj as OverlayTaggedObject).data?.isOverlay);
 }
 
 export function generateExportFilename(format: ExportFormat, timestamp?: number): string {

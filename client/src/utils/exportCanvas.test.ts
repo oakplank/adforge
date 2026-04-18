@@ -45,13 +45,13 @@ describe('DEFAULT_EXPORT_OPTIONS', () => {
 
 describe('exportCanvasToDataURL', () => {
   it('hides overlay objects during export and restores them', () => {
-    const overlayObj = { data: { isOverlay: true }, visible: true };
-    const safeZoneObj = { data: { isSafeZone: true }, visible: true };
-    const gridObj = { data: { isGrid: true }, visible: true };
+    const gridOverlay = { data: { isOverlay: true, kind: 'grid' }, visible: true };
+    const safeZoneOverlay = { data: { isOverlay: true, kind: 'safeZone' }, visible: true };
+    const untaggedOverlay = { data: undefined, visible: true };
     const normalObj = { data: {}, visible: true };
 
     const mockCanvas = {
-      getObjects: vi.fn(() => [overlayObj, safeZoneObj, gridObj, normalObj]),
+      getObjects: vi.fn(() => [gridOverlay, safeZoneOverlay, untaggedOverlay, normalObj]),
       renderAll: vi.fn(),
       toDataURL: vi.fn(() => 'data:image/png;base64,abc'),
     };
@@ -60,10 +60,9 @@ describe('exportCanvasToDataURL', () => {
     const result = exportCanvasToDataURL(mockCanvas as any, options);
 
     expect(result).toBe('data:image/png;base64,abc');
-    // Overlays should be restored
-    expect(overlayObj.visible).toBe(true);
-    expect(safeZoneObj.visible).toBe(true);
-    expect(gridObj.visible).toBe(true);
+    expect(gridOverlay.visible).toBe(true);
+    expect(safeZoneOverlay.visible).toBe(true);
+    expect(untaggedOverlay.visible).toBe(true);
     expect(normalObj.visible).toBe(true);
     expect(mockCanvas.renderAll).toHaveBeenCalledTimes(2);
   });
