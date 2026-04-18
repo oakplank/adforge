@@ -187,14 +187,18 @@ export class GenerationsStore {
     await ensureDirExists(dir);
 
     const files = await fs.readdir(dir);
-    const jsonFiles = files.filter((file) => file.endsWith('.json'));
+    // IDs are `gen-<Date.now()>-<rand>`, so filename sort matches creation-time sort.
+    // Sort + slice first so we only read/parse the top N files.
+    const topJsonFiles = files
+      .filter((file) => file.endsWith('.json'))
+      .sort((a, b) => b.localeCompare(a))
+      .slice(0, Math.max(1, limit));
 
     const entries = await Promise.all(
-      jsonFiles.map(async (file) => {
+      topJsonFiles.map(async (file) => {
         try {
           const raw = await fs.readFile(path.join(dir, file), 'utf8');
-          const parsed = JSON.parse(raw) as StoredGeneration;
-          return parsed;
+          return JSON.parse(raw) as StoredGeneration;
         } catch {
           return null;
         }
@@ -204,7 +208,6 @@ export class GenerationsStore {
     return entries
       .filter((entry): entry is StoredGeneration => entry !== null)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .slice(0, Math.max(1, limit))
       .map((entry) => this.toRecordOutput(entry));
   }
 

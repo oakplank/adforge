@@ -79,6 +79,36 @@ describe('Generations API', () => {
     expect(saveRes.body.generation.imageUrl).toBe('https://example.com/image.png');
   });
 
+  it('returns newest generations first and honors the limit query', async () => {
+    const { app } = await createTestApp();
+
+    const base64 = Buffer.from('image-bytes').toString('base64');
+    const baseAdSpec = { templateId: 'bold-sale' };
+
+    for (let i = 0; i < 5; i++) {
+      const res = await request(app).post('/api/generations').send({
+        prompt: `prompt-${i}`,
+        format: 'square',
+        imagePrompt: `imagePrompt-${i}`,
+        adSpec: baseAdSpec,
+        imageBase64: base64,
+        mimeType: 'image/png',
+      });
+      expect(res.status).toBe(201);
+      // Ensure filename-embedded timestamps differ so ordering is deterministic.
+      await new Promise((r) => setTimeout(r, 3));
+    }
+
+    const listRes = await request(app).get('/api/generations?limit=3');
+    expect(listRes.status).toBe(200);
+    expect(listRes.body.generations).toHaveLength(3);
+    expect(listRes.body.generations.map((g: { prompt: string }) => g.prompt)).toEqual([
+      'prompt-4',
+      'prompt-3',
+      'prompt-2',
+    ]);
+  });
+
   it('rejects image lookup when stored fileName escapes the generations dir', async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'adforge-traversal-'));
     const store = new GenerationsStore(tempDir);
