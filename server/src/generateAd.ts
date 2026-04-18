@@ -240,5 +240,3 @@ export function createGenerateAdRouter(): Router {
 
   return router;
 }
-
-export { VIBE_COLOR_MAP, COLOR_NAME_MAP };

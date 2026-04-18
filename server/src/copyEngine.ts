@@ -355,8 +355,6 @@ export function generateCopy(input: CopyInput): CopyOutput {
   return { headline, subhead, cta, formula };
 }
 
-export const generateAdCopy = generateCopy;
-
 export function validateCopy(copy: CopyOutput): ValidationResult {
   const errors: string[] = [];
 

@@ -132,4 +132,4 @@ export function useCanvasManipulation(canvas: Canvas | null) {
   return { configureObject };
 }
 
-export { getTransformFromObject, findLayerIdForObject, SNAP_THRESHOLD };
+export { getTransformFromObject, SNAP_THRESHOLD };

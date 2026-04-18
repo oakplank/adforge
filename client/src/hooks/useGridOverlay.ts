@@ -108,6 +108,3 @@ export function useGridOverlay(
     prevRef.current = { showGrid, showSafeZones, formatId, width, height };
   }, [canvas, showGrid, showSafeZones, formatId, width, height]);
 }
-
-// Export for testing
-export { createGridLines, createSafeZoneRects, getSafeZonePixels, OVERLAY_PREFIX };
