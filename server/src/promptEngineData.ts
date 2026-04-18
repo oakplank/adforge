@@ -12,7 +12,7 @@ export interface FormatConfig {
   composition: string;
 }
 
-export interface CategoryConfig {
+interface CategoryConfig {
   photographyStyle: string;
   lightingStyle: string;
   backgroundStyle: string;
@@ -39,25 +39,10 @@ export interface BrandProfile {
   styleProfileOverride?: keyof typeof STYLE_PROFILES;
 }
 
-export interface CreativeArchetype {
-  label: string;
-  creativeConcept: string;
-  heroSubjectDefault: string;
-  subjectTreatmentDefault: string;
-  categoryInsight: string;
-  emotionalTone: string;
-  visualEnergy: 'low' | 'medium' | 'high' | 'very high';
-}
-
 export interface ObjectiveStrategy {
   compositionStrategy: string;
   framingPriority: string;
   ctaPlacement: string;
-}
-
-export interface FormatFraming {
-  formatFramingRules: string;
-  textLanes: string;
 }
 
 export const FORMAT_CONFIGS: Record<string, FormatConfig> = {
@@ -256,54 +241,6 @@ export const CATEGORY_KEYWORDS: Record<string, string[]> = {
   jewelry: ['necklace', 'ring', 'bracelet', 'earring', 'jewelry', 'diamond', 'gold chain', 'pendant', 'watch'],
 };
 
-export const CATEGORY_ARCHETYPES: Record<string, CreativeArchetype> = {
-  food: {
-    label: 'Food, Drink & Hospitality',
-    creativeConcept: 'Sensory trigger through texture and warmth',
-    heroSubjectDefault: 'the dish or drink in tactile detail',
-    subjectTreatmentDefault: 'editorial hero angle with environmental context',
-    categoryInsight: 'Food ads convert on texture and authenticity, not perfection.',
-    emotionalTone: 'craving and comfort',
-    visualEnergy: 'low',
-  },
-  fitness: {
-    label: 'Fitness & Wellness',
-    creativeConcept: 'Aspirational-but-attainable movement moment',
-    heroSubjectDefault: 'person mid-effort with real form and focus',
-    subjectTreatmentDefault: 'in-context action framing with natural effort',
-    categoryInsight: 'Inspire capability; avoid intimidating or unrealistic body cues.',
-    emotionalTone: 'aspiration and determination',
-    visualEnergy: 'very high',
-  },
-  tech: {
-    label: 'SaaS & Software Products',
-    creativeConcept: 'Outcome-first visual metaphor with clean composition',
-    heroSubjectDefault: 'conceptual scene or premium device context',
-    subjectTreatmentDefault: 'isolated or minimal workspace environment',
-    categoryInsight: 'Simplicity sells software; visual clutter lowers trust and CTR.',
-    emotionalTone: 'clarity and control',
-    visualEnergy: 'low',
-  },
-  home: {
-    label: 'Real Estate & Property',
-    creativeConcept: 'Aspirational lived-in space that feels attainable',
-    heroSubjectDefault: 'the environment and lifestyle context',
-    subjectTreatmentDefault: 'architectural-lifestyle blend with natural light',
-    categoryInsight: 'Sell the feeling of life in the space, not just dimensions.',
-    emotionalTone: 'belonging and aspiration',
-    visualEnergy: 'low',
-  },
-  general: {
-    label: 'Websites & Digital Services',
-    creativeConcept: 'Lifestyle-in-context showing the outcome the service enables',
-    heroSubjectDefault: 'person experiencing the service outcome',
-    subjectTreatmentDefault: 'environmental lifestyle with natural behavior',
-    categoryInsight: 'Service ads convert when viewers see themselves in the moment.',
-    emotionalTone: 'trust and possibility',
-    visualEnergy: 'medium',
-  },
-};
-
 export const OBJECTIVE_STRATEGIES: Record<'awareness' | 'conversion' | 'engagement' | 'brand_building', ObjectiveStrategy> = {
   awareness: {
     compositionStrategy: 'Wide environmental framing with generous negative space for copy lanes.',
@@ -327,17 +264,3 @@ export const OBJECTIVE_STRATEGIES: Record<'awareness' | 'conversion' | 'engageme
   },
 };
 
-export const FORMAT_FRAMING: Record<string, FormatFraming> = {
-  square: {
-    formatFramingRules: 'Center-weighted focal point with controlled top/bottom lanes.',
-    textLanes: 'top headline, bottom action line',
-  },
-  portrait: {
-    formatFramingRules: 'Vertical sandwich layout with clean top and bottom safe zones.',
-    textLanes: 'top headline zone, bottom action zone, optional left subhead rail',
-  },
-  story: {
-    formatFramingRules: 'Vertical depth layering with subject in middle third.',
-    textLanes: 'top headline, mid side subhead, bottom action line',
-  },
-};

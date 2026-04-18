@@ -118,7 +118,7 @@ describe('buildPromptPipeline', () => {
     expect(result.promptPipeline.baseCreativeBrief).toContain('Goal: offer');
     expect(result.promptPipeline.renderPrompt).toContain('Instagram');
     expect(result.promptPipeline.systemPrompt).toContain('creative director');
-    expect(result.promptPipeline.renderPrompt).toContain('Composition strategy');
+    expect(result.promptPipeline.renderPrompt).toContain('running shoes');
     expect(result.promptPipeline.qualityChecklist.length).toBeGreaterThan(2);
     expect(result.placementHints.ctaPriority).toBe('high');
     expect(result.suggestedTemplateId).toBe('bold-sale');
@@ -155,13 +155,8 @@ describe('buildPromptPipeline', () => {
     expect(result.placementHints.preferredAlignment).toBe('right');
     expect(result.placementHints.avoidCenter).toBe(true);
     expect(result.suggestedTemplateId).toBe('minimal');
-    expect(result.promptPipeline.renderPrompt).toContain('right 45%');
     expect(result.promptPipeline.renderPrompt).toContain('Do not render tablets, phones, laptops');
-    expect(result.promptPipeline.renderPrompt).toContain('one primary anchor object');
     expect(result.promptPipeline.systemPrompt).toContain('narrative logic');
-    expect(result.promptPipeline.interpretiveLayer.selectedDirection).toBeTruthy();
-    expect(result.promptPipeline.interpretiveLayer.refinedSceneInstruction).toContain('single');
-    expect(result.promptPipeline.renderPrompt).toContain('Interpretive direction selected');
   });
 });
 

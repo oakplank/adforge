@@ -62,7 +62,7 @@ describe('generateAdSpec', () => {
     expect(spec.metadata?.promptPipeline.baseCreativeBrief).toContain('Goal: offer');
     expect(spec.metadata?.promptPipeline.renderPrompt).toContain('Instagram');
     expect(spec.metadata?.promptPipeline.systemPrompt).toContain('creative director');
-    expect(spec.metadata?.promptPipeline.renderPrompt).toContain('Composition strategy');
+    expect(spec.metadata?.promptPipeline.renderPrompt).toContain('shoes');
     expect(spec.metadata?.promptPipeline.qualityChecklist.length).toBeGreaterThan(2);
     expect(spec.metadata?.placementHints).toBeDefined();
     expect(spec.metadata?.agenticPlan).toBeDefined();
