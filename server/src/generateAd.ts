@@ -217,7 +217,7 @@ export function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId
       },
       headlineFormula: copy.formula,
       contrastRatios: layout.contrastRatios,
-      formatConfig: strategy.formatConfig as FormatConfig,
+      formatConfig: strategy.formatConfig,
     },
   };
 }
