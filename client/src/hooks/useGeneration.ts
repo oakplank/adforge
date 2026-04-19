@@ -1,9 +1,4 @@
 import { useState } from 'react';
-import {
-  analyzeImageForPlacement,
-  type PlacementHints,
-  type PlacementPlan,
-} from '../utils/imagePlacementAnalyzer';
 
 interface FormatConfig {
   id: string;
@@ -50,7 +45,6 @@ export interface AdSpec {
     formatConfig?: FormatConfig;
     promptPipeline?: PromptPipeline;
     placementHints?: PlacementPlanHints;
-    placementPlan?: PlacementPlan;
     agenticPlan?: AgenticPlan;
     model?: {
       provider: 'google';
@@ -78,46 +72,6 @@ const FORMAT_DIMENSIONS: Record<string, { width: number; height: number }> = {
   portrait: { width: 1080, height: 1350 },
   story: { width: 1080, height: 1920 },
 };
-
-async function analyzeWithTimeout(source: string, hints: PlacementHints, timeoutMs = 1200): Promise<PlacementPlan | null> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const timeout = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        resolve(null);
-      }
-    }, timeoutMs);
-
-    analyzeImageForPlacement(source, hints)
-      .then((plan) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeout);
-        resolve(plan);
-      })
-      .catch(() => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeout);
-        resolve(null);
-      });
-  });
-}
-
-function toPlacementHints(adSpec: AdSpec, format: string): PlacementHints {
-  const metadata = adSpec.metadata;
-
-  return {
-    formatId: (format as PlacementHints['formatId']) || 'square',
-    objective: metadata?.objective,
-    preferredAlignment: metadata?.placementHints?.preferredAlignment || 'auto',
-    preferredHeadlineBand: metadata?.placementHints?.preferredHeadlineBand || 'top',
-    avoidCenter: metadata?.placementHints?.avoidCenter ?? false,
-    accentColor: adSpec.colors.accent,
-    backgroundColor: adSpec.colors.background,
-  };
-}
 
 async function persistGenerationHistory(
   prompt: string,
@@ -210,19 +164,6 @@ export function useGeneration(): UseGenerationReturn {
 
       const imgData = await imgRes.json();
       const imgMimeType = typeof imgData.mimeType === 'string' ? imgData.mimeType : 'image/png';
-      const imageSrc = imgData.imageBase64
-        ? `data:${imgMimeType};base64,${imgData.imageBase64}`
-        : imgData.imageUrl;
-
-      if (imageSrc && imageSrc.startsWith('data:')) {
-        const placementPlan = await analyzeWithTimeout(imageSrc, toPlacementHints(adSpec, format));
-        if (placementPlan) {
-          adSpec.metadata = {
-            ...adSpec.metadata,
-            placementPlan,
-          };
-        }
-      }
 
       const genResult: GenerationResult = {
         adSpec,
