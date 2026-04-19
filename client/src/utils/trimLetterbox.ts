@@ -96,7 +96,7 @@ function loadImageElement(src: string): Promise<HTMLImageElement> {
   });
 }
 
-export interface TrimResult {
+interface TrimResult {
   src: string;
   trimmed: boolean;
   cropTop: number;
