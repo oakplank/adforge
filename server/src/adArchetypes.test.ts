@@ -64,6 +64,35 @@ describe('adArchetypes registry', () => {
       expect(entry.examplePrompts.length).toBeGreaterThan(0);
     }
   });
+
+  it('every archetype ships a display + body font stack', () => {
+    for (const a of Object.values(AD_ARCHETYPES)) {
+      expect(typeof a.copy.fonts.display).toBe('string');
+      expect(typeof a.copy.fonts.body).toBe('string');
+      // Stacks must end in a generic family so Fabric + browsers can
+      // always fall back to something — catches a typo'd stack early.
+      expect(a.copy.fonts.display).toMatch(/(sans-serif|serif|monospace)\s*$/);
+      expect(a.copy.fonts.body).toMatch(/(sans-serif|serif|monospace)\s*$/);
+    }
+  });
+
+  it('listArchetypes includes fonts for each entry', () => {
+    const list = listArchetypes();
+    for (const entry of list) {
+      expect(entry.fonts.display.length).toBeGreaterThan(0);
+      expect(entry.fonts.body.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('luxury ships a serif display stack, sale-offer a condensed display', () => {
+    // Sanity-check the matchup between the archetype brief and the fonts
+    // we ship. If someone swaps these we want a loud failure, not a
+    // silently serif luxury and sans-serif couture.
+    expect(AD_ARCHETYPES.luxury.copy.fonts.display.toLowerCase()).toContain('serif');
+    expect(AD_ARCHETYPES['sale-offer'].copy.fonts.display.toLowerCase()).toMatch(
+      /anton|oswald|impact/,
+    );
+  });
 });
 
 describe('archetype-driven render prompt', () => {

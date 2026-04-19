@@ -59,6 +59,13 @@ interface AdSpec {
   templateId: string;
   category: string;
   archetypeId: ArchetypeId;
+  // Archetype-specific font stacks. `display` for the headline, `body` for
+  // subhead + CTA. Clients that drop copy onto the canvas should honor these
+  // so a luxury pick renders in a serif and a sale pick in a heavy sans.
+  fonts: {
+    display: string;
+    body: string;
+  };
   layout?: LayoutOutput;
   metadata?: {
     objective: Objective;
@@ -236,6 +243,7 @@ export function generateAdSpec(
     templateId: templateId ?? strategy.suggestedTemplateId,
     category: strategy.category,
     archetypeId: strategy.archetypeId,
+    fonts: { ...archetype.copy.fonts },
     layout,
     metadata: {
       objective: strategy.objective,

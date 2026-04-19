@@ -160,4 +160,75 @@ describe('CopySuggestions', () => {
     );
     expect(screen.getByTestId('copy-chip-headline')).toBeDisabled();
   });
+
+  it('uses archetype display font for the inserted headline', () => {
+    // When the adSpec ships an archetype font stack, the inserted IText
+    // layer must pick that up — otherwise the "pick luxury, see serif"
+    // promise silently breaks.
+    const luxurySpec: AdSpec = {
+      ...testAdSpec,
+      archetypeId: 'luxury',
+      fonts: {
+        display: '"Playfair Display", Georgia, serif',
+        body: '"Inter", system-ui, sans-serif',
+      },
+    };
+    const canvas = makeCanvas();
+    render(
+      <GenerationProvider>
+        <AdSpecSeeder spec={luxurySpec}>
+          <CopySuggestions canvas={canvas as never} />
+        </AdSpecSeeder>
+      </GenerationProvider>,
+    );
+
+    fireEvent.click(screen.getByTestId('copy-chip-headline'));
+    const added = canvas.add.mock.calls[0][0];
+    expect(added.fontFamily).toBe('"Playfair Display", Georgia, serif');
+  });
+
+  it('uses archetype body font for subhead + CTA inserts', () => {
+    const saleSpec: AdSpec = {
+      ...testAdSpec,
+      archetypeId: 'sale-offer',
+      fonts: {
+        display: '"Anton", Impact, sans-serif',
+        body: '"Inter", Arial, sans-serif',
+      },
+    };
+    const canvas = makeCanvas();
+    render(
+      <GenerationProvider>
+        <AdSpecSeeder spec={saleSpec}>
+          <CopySuggestions canvas={canvas as never} />
+        </AdSpecSeeder>
+      </GenerationProvider>,
+    );
+
+    fireEvent.click(screen.getByTestId('copy-chip-subhead'));
+    const subheadObj = canvas.add.mock.calls[0][0];
+    expect(subheadObj.fontFamily).toBe('"Inter", Arial, sans-serif');
+
+    fireEvent.click(screen.getByTestId('copy-chip-cta'));
+    const ctaGroup = canvas.add.mock.calls[1][0];
+    // CTA text is the second child of the group (pill first).
+    expect(ctaGroup.children[1].fontFamily).toBe('"Inter", Arial, sans-serif');
+  });
+
+  it('falls back to Space Grotesk when the spec has no fonts (pre-archetype generations)', () => {
+    // Generations saved before the font field shipped must still insert
+    // legibly — we fall back to the original hardcoded default.
+    const canvas = makeCanvas();
+    render(
+      <GenerationProvider>
+        <AdSpecSeeder spec={testAdSpec}>
+          <CopySuggestions canvas={canvas as never} />
+        </AdSpecSeeder>
+      </GenerationProvider>,
+    );
+
+    fireEvent.click(screen.getByTestId('copy-chip-headline'));
+    const added = canvas.add.mock.calls[0][0];
+    expect(added.fontFamily).toContain('Space Grotesk');
+  });
 });

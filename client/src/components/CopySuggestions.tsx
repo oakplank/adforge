@@ -56,6 +56,13 @@ export function CopySuggestions({ canvas }: CopySuggestionsProps) {
   const ctaText = cleanCopy(lastAdSpec?.texts?.cta);
   const accent = lastAdSpec?.colors?.accent || '#ff6a3d';
 
+  // Archetype-specific font stacks, if the server shipped them. Older
+  // generations that predate this field fall back to the Space Grotesk
+  // default — same behavior as before the archetype font work.
+  const DEFAULT_FONT = 'Space Grotesk, Inter, system-ui, sans-serif';
+  const displayFont = lastAdSpec?.fonts?.display || DEFAULT_FONT;
+  const bodyFont = lastAdSpec?.fonts?.body || DEFAULT_FONT;
+
   const insertText = useCallback(
     (kind: CopyKind) => {
       if (!canvas) return;
@@ -92,7 +99,7 @@ export function CopySuggestions({ canvas }: CopySuggestionsProps) {
         const text = new IText(label, {
           fontSize,
           fill: textColor,
-          fontFamily: 'Space Grotesk, Inter, system-ui, sans-serif',
+          fontFamily: bodyFont,
           fontWeight: 'bold',
           originX: 'center',
           originY: 'center',
@@ -131,7 +138,7 @@ export function CopySuggestions({ canvas }: CopySuggestionsProps) {
         fontSize,
         fontWeight: kind === 'headline' ? 'bold' : 'normal',
         fill: contrast.fill,
-        fontFamily: 'Space Grotesk, Inter, system-ui, sans-serif',
+        fontFamily: kind === 'headline' ? displayFont : bodyFont,
         textAlign: 'center',
         left,
         top,
@@ -159,7 +166,7 @@ export function CopySuggestions({ canvas }: CopySuggestionsProps) {
       });
       selectLayer(id);
     },
-    [accent, addLayer, canvas, ctaText, headline, selectLayer, subhead],
+    [accent, addLayer, bodyFont, canvas, ctaText, displayFont, headline, selectLayer, subhead],
   );
 
   if (!lastAdSpec) {

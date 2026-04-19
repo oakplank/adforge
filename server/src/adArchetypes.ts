@@ -59,10 +59,20 @@ export interface ArchetypeCopyGuidelines {
   // Prose direction passed to a downstream LLM copywriter once we have
   // one. Also serves as a human-readable rationale in the UI.
   tone: string;
-  // A one-liner font direction for the overlay. Not enforced yet, but
-  // future work can consume this to pre-select a font stack when the user
-  // inserts a headline chip.
+  // A one-liner font direction for the overlay. Human-readable rationale
+  // used as a design note; the actual font stack lives in `fonts` below.
   typographyVibe: string;
+  // CSS font-family stacks used when the client drops a headline / subhead /
+  // CTA layer from the Copy Suggestions panel. Each archetype ships its own
+  // display + body pairing so a luxury pick actually renders in a serif and
+  // a sale pick in a heavy condensed sans. Stacks are web-safe: the first
+  // choice is typically a Google Font (not yet loaded at runtime), so the
+  // fallbacks carry the weight. Once the app loads the first-choice fonts,
+  // the visual match to each archetype tightens further.
+  fonts: {
+    display: string;
+    body: string;
+  };
 }
 
 export interface ArchetypeImageDirection {
@@ -138,6 +148,10 @@ const GENERAL: ArchetypeDefinition = {
     capitalization: 'sentence',
     tone: 'Confident, clear, concrete. Lead with the benefit, not the feature.',
     typographyVibe: 'modern grotesk like Space Grotesk or Inter, medium weight',
+    fonts: {
+      display: '"Space Grotesk", "Inter", system-ui, sans-serif',
+      body: '"Inter", "Space Grotesk", system-ui, sans-serif',
+    },
   },
   defaultPalette: {
     primary: '#101826',
@@ -184,6 +198,10 @@ const PRODUCT_LAUNCH: ArchetypeDefinition = {
     capitalization: 'sentence',
     tone: 'Announce with quiet confidence. Name the product, hint at why it matters, stop talking.',
     typographyVibe: 'large display grotesk with tight tracking',
+    fonts: {
+      display: '"Space Grotesk", "Inter", "Helvetica Neue", system-ui, sans-serif',
+      body: '"Inter", "Space Grotesk", system-ui, sans-serif',
+    },
   },
   defaultPalette: {
     primary: '#111827',
@@ -229,6 +247,10 @@ const SALE_OFFER: ArchetypeDefinition = {
     capitalization: 'upper',
     tone: 'Urgent and specific. Lead with the number. End with a verb.',
     typographyVibe: 'condensed heavy display, UPPERCASE headline, italic optional for urgency',
+    fonts: {
+      display: '"Anton", "Oswald", "Impact", "Helvetica Neue", Arial, sans-serif',
+      body: '"Inter", "Helvetica Neue", Arial, sans-serif',
+    },
   },
   defaultPalette: {
     primary: '#DC2626',
@@ -275,6 +297,10 @@ const LUXURY: ArchetypeDefinition = {
     capitalization: 'sentence',
     tone: 'Speak softly. One sharp observation, no selling words. The image earns the headline.',
     typographyVibe: 'display serif (Playfair, DM Serif) or fine-weight grotesk, airy tracking',
+    fonts: {
+      display: '"Playfair Display", "DM Serif Display", "Cormorant Garamond", Georgia, serif',
+      body: '"Inter", "Söhne", system-ui, sans-serif',
+    },
   },
   defaultPalette: {
     primary: '#1A1A1A',
@@ -321,6 +347,10 @@ const FOOD_BEVERAGE: ArchetypeDefinition = {
     capitalization: 'sentence',
     tone: 'Sensory and specific. Name the ingredient or the moment, not the marketing.',
     typographyVibe: 'warm humanist serif or soft grotesk; exclamation only for flash offers',
+    fonts: {
+      display: '"Fraunces", "Playfair Display", Georgia, serif',
+      body: '"Inter", "Söhne", system-ui, sans-serif',
+    },
   },
   defaultPalette: {
     primary: '#7C2D12',
@@ -367,6 +397,10 @@ const BEAUTY_SKINCARE: ArchetypeDefinition = {
     capitalization: 'sentence',
     tone: 'Quiet, sensory, ingredient-led. Avoid superlatives. Let the skin imagery do the work.',
     typographyVibe: 'fine-weight display serif or airy grotesk with open tracking',
+    fonts: {
+      display: '"Cormorant Garamond", "Playfair Display", Georgia, serif',
+      body: '"Inter", "Söhne", system-ui, sans-serif',
+    },
   },
   defaultPalette: {
     primary: '#4A3E39',
@@ -413,6 +447,10 @@ const TECH_SAAS: ArchetypeDefinition = {
     capitalization: 'sentence',
     tone: 'Specific and benefit-led. No jargon, no buzzwords. State the outcome.',
     typographyVibe: 'modern sans like Inter, Söhne, or Space Grotesk; medium weight headline',
+    fonts: {
+      display: '"Inter", "Söhne", "Space Grotesk", system-ui, sans-serif',
+      body: '"Inter", "Söhne", system-ui, sans-serif',
+    },
   },
   defaultPalette: {
     primary: '#0F172A',
@@ -459,6 +497,10 @@ const FITNESS_ATHLETIC: ArchetypeDefinition = {
     capitalization: 'upper',
     tone: 'Verbs, imperatives, no filler. "Run the city." "Break it." "Train for ten more."',
     typographyVibe: 'heavy condensed display, italic optional, tight tracking',
+    fonts: {
+      display: '"Anton", "Oswald", "Impact", "Helvetica Neue", Arial, sans-serif',
+      body: '"Inter", "Helvetica Neue", Arial, sans-serif',
+    },
   },
   defaultPalette: {
     primary: '#0A0A0A',
@@ -505,6 +547,10 @@ const TRAVEL_HOSPITALITY: ArchetypeDefinition = {
     capitalization: 'sentence',
     tone: 'Evocative, place-specific, warm. Mention the location or the feeling of being there.',
     typographyVibe: 'refined serif or airy humanist sans with wide tracking',
+    fonts: {
+      display: '"Cormorant Garamond", "Playfair Display", Georgia, serif',
+      body: '"Inter", "Söhne", system-ui, sans-serif',
+    },
   },
   defaultPalette: {
     primary: '#2C1810',
@@ -551,6 +597,10 @@ const EDITORIAL_CAUSE: ArchetypeDefinition = {
     capitalization: 'sentence',
     tone: 'First-person voice, specific and human. A long headline can read as a pull-quote.',
     typographyVibe: 'editorial serif (Tiempos, Publico) or high-contrast display; quote marks allowed',
+    fonts: {
+      display: '"Playfair Display", "Fraunces", Georgia, serif',
+      body: '"Inter", "Söhne", system-ui, sans-serif',
+    },
   },
   defaultPalette: {
     primary: '#1E293B',
@@ -603,12 +653,15 @@ export function getArchetype(id: string | undefined): ArchetypeDefinition {
 
 // Public listing used by the /api/archetypes endpoint. Includes the
 // per-archetype example prompts so the client picker can surface them
-// as contextual quick-prompt chips.
+// as contextual quick-prompt chips, plus the font stacks so a client
+// that wants to preview typography alongside the picker chip can do so
+// without threading a second fetch.
 export function listArchetypes(): Array<{
   id: ArchetypeId;
   label: string;
   description: string;
   examplePrompts: string[];
+  fonts: { display: string; body: string };
 }> {
   return ARCHETYPE_PICKER_ORDER.map((id) => {
     const a = AD_ARCHETYPES[id];
@@ -617,6 +670,7 @@ export function listArchetypes(): Array<{
       label: a.label,
       description: a.description,
       examplePrompts: a.examplePrompts,
+      fonts: { ...a.copy.fonts },
     };
   });
 }

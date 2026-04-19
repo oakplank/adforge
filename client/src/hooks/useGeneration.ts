@@ -41,6 +41,9 @@ export interface AdSpec {
   templateId: string;
   category?: string;
   archetypeId?: string;
+  // Per-archetype font stacks. Older generations (before this field shipped)
+  // will be missing this; consumers must fall back to their own defaults.
+  fonts?: { display: string; body: string };
   metadata?: {
     objective?: 'offer' | 'launch' | 'awareness';
     formatConfig?: FormatConfig;

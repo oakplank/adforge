@@ -209,6 +209,23 @@ describe('POST /api/generate-ad', () => {
     expect(res.status).toBe(200);
     expect(res.body.archetypeId).toBe('general');
   });
+
+  it('returns archetype-specific fonts on the AdSpec', async () => {
+    // Luxury should get a serif display, sale-offer a condensed display.
+    // The client uses these to font-match the inserted headline layer.
+    const lux = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'new dive watch', archetypeId: 'luxury' });
+    expect(lux.status).toBe(200);
+    expect(lux.body.fonts?.display).toBeTruthy();
+    expect(lux.body.fonts.display.toLowerCase()).toContain('serif');
+
+    const sale = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'flash sale 30% off shoes', archetypeId: 'sale-offer' });
+    expect(sale.status).toBe(200);
+    expect(sale.body.fonts.display.toLowerCase()).toMatch(/anton|oswald|impact/);
+  });
 });
 
 describe('GET /api/archetypes', () => {
@@ -221,6 +238,9 @@ describe('GET /api/archetypes', () => {
       expect(typeof a.id).toBe('string');
       expect(typeof a.label).toBe('string');
       expect(typeof a.description).toBe('string');
+      // Fonts ship with the catalog so clients can preview typography.
+      expect(typeof a.fonts?.display).toBe('string');
+      expect(typeof a.fonts?.body).toBe('string');
     }
     // General should not be in the user-facing picker.
     expect(res.body.archetypes.map((a: { id: string }) => a.id)).not.toContain(
