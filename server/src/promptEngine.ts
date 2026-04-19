@@ -225,12 +225,12 @@ function buildRenderPrompt(input: {
   product: string;
   description: string;
   formatConfig: FormatConfig;
-  textSafeZoneInstructions: string;
   colors?: string[];
   audience?: string;
   brand?: BrandProfile;
 }): string {
-  const { rawPrompt, product, description, formatConfig, textSafeZoneInstructions, colors, audience, brand } = input;
+  const { rawPrompt, product, description, formatConfig, colors, audience, brand } = input;
+  void description;
 
   const userIntent = normalizeWhitespace(rawPrompt || description || product);
   const paletteClause =
@@ -261,8 +261,12 @@ function buildRenderPrompt(input: {
       audienceClause,
       ...brandClauses,
       paletteClause,
-      textSafeZoneInstructions,
-      'No text, logos, or watermarks in the image itself — overlay text is added in post.',
+      // We intentionally do NOT reserve text safe zones anymore — forcing the
+      // model to keep the top/bottom 20% empty was flattening compositions.
+      // The editor handles overlay legibility with scrims/shapes/contrast.
+      // Editable overlays are added in post, so the model should not bake
+      // typography into the pixels.
+      'Do not render text, typography, captions, subtitles, logos, or watermarks inside the image — leave all copy for the overlay layer.',
       'Use your creative judgment to compose something magazine-quality that serves the brief; avoid centered tabletop cliché unless clearly right for the idea.',
     ]
       .filter(Boolean)
@@ -280,7 +284,10 @@ function buildSystemPrompt(profile: StyleProfile, objective: Objective, brand?: 
       'You are the creative director at a top-tier performance marketing agency producing platform-native paid social visuals.',
       `Objective: ${objective}. Style: ${profile.name} (${profile.visualTone}).`,
       brandTone,
-      'Reserve quiet negative space so downstream layout can place headline, subhead, and CTA. No text, logos, or watermarks in the image.',
+      // Keep the image clean of typography so the editor can layer real,
+      // editable copy on top. No forced quiet bands — the compositor can
+      // handle contrast with scrims and shapes if the scene is busy.
+      'No text, typography, logos, or watermarks inside the image. Compose freely: the overlay layer handles all copy.',
     ].join(' ')
   );
 }
@@ -336,7 +343,6 @@ export function generateEnhancedPrompt(
       product,
       description,
       formatConfig,
-      textSafeZoneInstructions,
       colors: mergedColors,
       brand,
     }),
@@ -406,7 +412,6 @@ export function buildPromptPipeline(options: {
     product,
     description,
     formatConfig,
-    textSafeZoneInstructions,
     colors: mergedColors,
     audience,
     brand,

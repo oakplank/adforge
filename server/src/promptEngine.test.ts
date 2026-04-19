@@ -96,10 +96,16 @@ describe('generateEnhancedPrompt', () => {
     expect(result.formatConfig.aspectRatio).toBe('1:1');
   });
 
-  it('includes safe-zone guidance in render prompt output', () => {
+  it('tells the model to leave text out so the overlay layer can own copy', () => {
     const result = generateEnhancedPrompt('watch', 'luxury watch', 'luxury', 'portrait');
-    expect(result.prompt.toLowerCase()).toContain('top');
-    expect(result.prompt.toLowerCase()).toContain('bottom');
+    expect(result.prompt.toLowerCase()).toContain('do not render text');
+    expect(result.prompt.toLowerCase()).toContain('overlay layer');
+  });
+
+  it('forbids letterbox/pillarbox margins', () => {
+    const result = generateEnhancedPrompt('watch', 'luxury watch', 'luxury', 'portrait');
+    expect(result.prompt.toLowerCase()).toContain('edge-to-edge');
+    expect(result.prompt.toLowerCase()).toContain('letterbox');
   });
 });
 

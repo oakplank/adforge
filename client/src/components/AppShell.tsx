@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import type { Canvas } from 'fabric';
 import { CanvasEditor } from './CanvasEditor';
 import { CanvasLoadingOverlay } from './CanvasLoadingOverlay';
+import { CopySuggestions } from './CopySuggestions';
 import { ExportDialog } from './ExportDialog';
 import { FormatSelector } from './FormatSelector';
 import { GenerationHistoryPanel } from './GenerationHistoryPanel';
@@ -19,7 +20,7 @@ import { useSavedAds } from '../hooks/useSavedAds';
 
 export function AppShell() {
   const { format } = useFormat();
-  const { isGenerating } = useGenerationState();
+  const { isGenerating, setLastAdSpec } = useGenerationState();
   const [canvas, setCanvas] = useState<Canvas | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
@@ -62,16 +63,18 @@ export function AppShell() {
 
   const handleGenerated = useCallback(async (result: GenerationResult) => {
     await compose(result);
+    setLastAdSpec(result.adSpec);
     void refreshHistory();
-  }, [compose, refreshHistory]);
+  }, [compose, refreshHistory, setLastAdSpec]);
 
   const handleLoadGeneration = useCallback(async (item: GenerationHistoryItem) => {
     await compose({
       adSpec: item.adSpec,
       imageUrl: item.imageUrl,
     });
+    setLastAdSpec(item.adSpec);
     setShowGenerations(false);
-  }, [compose]);
+  }, [compose, setLastAdSpec]);
 
   return (
     <div className="app-shell h-screen w-screen flex flex-col overflow-hidden" data-testid="app-shell">
@@ -139,8 +142,11 @@ export function AppShell() {
             </button>
           </div>
           {!leftCollapsed && (
-            <div className="flex-1 overflow-y-auto overflow-x-hidden">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col">
               <LayersPanel />
+              <div className="border-t border-zinc-800/70 mt-2 pt-2">
+                <CopySuggestions canvas={canvas} />
+              </div>
             </div>
           )}
         </aside>

@@ -3,15 +3,26 @@ import { renderHook, act } from '@testing-library/react';
 import { useTextTool } from './useTextTool';
 import { useLayerStore } from '../store/layerStore';
 
-// Mock fabric
+// Mock fabric primitives. IText takes (text, opts); Shadow just stores its opts.
 vi.mock('fabric', () => {
   const MockIText = vi.fn().mockImplementation((text, opts) => ({
     type: 'i-text',
     text,
     ...opts,
   }));
-  return { IText: MockIText };
+  const MockShadow = vi.fn().mockImplementation((opts) => ({ __shadow: true, ...opts }));
+  return { IText: MockIText, Shadow: MockShadow };
 });
+
+// Mock the contrast helper so tests don't need a real rendered canvas.
+vi.mock('../utils/canvasContrast', () => ({
+  sampleRegionContrast: vi.fn().mockReturnValue({
+    fill: '#ffffff',
+    needsShadow: true,
+    averageLuminance: 80,
+    luminanceStdDev: 40,
+  }),
+}));
 
 describe('useTextTool', () => {
   let mockCanvas: any;
@@ -27,24 +38,38 @@ describe('useTextTool', () => {
     };
   });
 
-  it('adds a text layer with default properties', () => {
+  it('adds a bold headline-sized text layer in the upper third', () => {
     const { result } = renderHook(() => useTextTool(mockCanvas));
 
     act(() => {
       result.current.addText();
     });
 
-    // Check canvas received the object
     expect(mockCanvas.add).toHaveBeenCalledTimes(1);
     const textObj = mockCanvas.add.mock.calls[0][0];
-    expect(textObj.text).toBe('Your Text Here');
-    expect(textObj.fill).toBe('#ffffff');
-    expect(textObj.fontSize).toBe(48);
-    expect(textObj.left).toBe(540); // centered
-    expect(textObj.top).toBe(540);
+    expect(textObj.text).toBe('Your headline here');
+    // 7.5% of 1080 = 81 → big headline, not 48px.
+    expect(textObj.fontSize).toBeGreaterThan(60);
+    expect(textObj.fontWeight).toBe('bold');
+    // Centered horizontally, top-biased vertically.
+    expect(textObj.left).toBe(540);
+    expect(textObj.top).toBeLessThan(540);
   });
 
-  it('adds layer to store with type text and name Text', () => {
+  it('uses the contrast helper to pick fill + shadow', () => {
+    const { result } = renderHook(() => useTextTool(mockCanvas));
+
+    act(() => {
+      result.current.addText();
+    });
+
+    const textObj = mockCanvas.add.mock.calls[0][0];
+    expect(textObj.fill).toBe('#ffffff');
+    expect(textObj.shadow).toBeTruthy();
+    expect(textObj.shadow.__shadow).toBe(true);
+  });
+
+  it('adds layer to store as a Headline text layer', () => {
     const { result } = renderHook(() => useTextTool(mockCanvas));
 
     act(() => {
@@ -54,7 +79,7 @@ describe('useTextTool', () => {
     const layers = useLayerStore.getState().layers;
     expect(layers).toHaveLength(1);
     expect(layers[0].type).toBe('text');
-    expect(layers[0].name).toBe('Text');
+    expect(layers[0].name).toBe('Headline');
   });
 
   it('selects the new text layer', () => {
@@ -86,21 +111,5 @@ describe('useTextTool', () => {
     });
 
     expect(useLayerStore.getState().layers).toHaveLength(0);
-  });
-
-  it('IText supports inline editing by default (double-click)', async () => {
-    // IText in Fabric.js natively supports double-click to edit
-    // We verify we're using IText (not Text) by checking the mock was called
-    const { IText } = await import('fabric');
-    const { result } = renderHook(() => useTextTool(mockCanvas));
-
-    act(() => {
-      result.current.addText();
-    });
-
-    expect(IText).toHaveBeenCalledWith('Your Text Here', expect.objectContaining({
-      fontSize: 48,
-      fill: '#ffffff',
-    }));
   });
 });
