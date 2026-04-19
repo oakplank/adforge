@@ -187,4 +187,44 @@ describe('POST /api/generate-ad', () => {
     expect(res.body.metadata.agenticPlan).toBeDefined();
     expect(res.body.metadata.promptPipeline.systemPrompt).toBeTruthy();
   });
+
+  it('honors archetypeId when provided', async () => {
+    const res = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'new dive watch', archetypeId: 'luxury' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.archetypeId).toBe('luxury');
+    // Luxury brief shapes the render prompt.
+    expect(res.body.metadata.promptPipeline.renderPrompt.toLowerCase()).toContain(
+      'luxury',
+    );
+  });
+
+  it('falls back to general archetype for unknown archetypeId', async () => {
+    const res = await request(app)
+      .post('/api/generate-ad')
+      .send({ prompt: 'new dive watch', archetypeId: 'not-a-real-archetype' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.archetypeId).toBe('general');
+  });
+});
+
+describe('GET /api/archetypes', () => {
+  it('returns the archetype catalog', async () => {
+    const res = await request(app).get('/api/archetypes');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.archetypes)).toBe(true);
+    expect(res.body.archetypes.length).toBeGreaterThan(3);
+    for (const a of res.body.archetypes) {
+      expect(typeof a.id).toBe('string');
+      expect(typeof a.label).toBe('string');
+      expect(typeof a.description).toBe('string');
+    }
+    // General should not be in the user-facing picker.
+    expect(res.body.archetypes.map((a: { id: string }) => a.id)).not.toContain(
+      'general',
+    );
+  });
 });

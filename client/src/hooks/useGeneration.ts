@@ -40,6 +40,7 @@ export interface AdSpec {
   colors: { primary: string; secondary: string; accent: string; text: string; background: string };
   templateId: string;
   category?: string;
+  archetypeId?: string;
   metadata?: {
     objective?: 'offer' | 'launch' | 'awareness';
     formatConfig?: FormatConfig;
@@ -64,7 +65,12 @@ interface UseGenerationReturn {
   isGenerating: boolean;
   error: string | null;
   result: GenerationResult | null;
-  generate: (prompt: string, format: string, templateId?: string) => Promise<GenerationResult | null>;
+  generate: (
+    prompt: string,
+    format: string,
+    templateId?: string,
+    archetypeId?: string | null,
+  ) => Promise<GenerationResult | null>;
 }
 
 const FORMAT_DIMENSIONS: Record<string, { width: number; height: number }> = {
@@ -110,15 +116,26 @@ export function useGeneration(): UseGenerationReturn {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<GenerationResult | null>(null);
 
-  async function generate(prompt: string, format: string, templateId?: string): Promise<GenerationResult | null> {
+  async function generate(
+    prompt: string,
+    format: string,
+    templateId?: string,
+    archetypeId?: string | null,
+  ): Promise<GenerationResult | null> {
     setError(null);
     setIsGenerating(true);
 
     try {
+      // Only include archetypeId in the payload when the caller selected
+      // one. The server treats missing/empty as the default `general`
+      // archetype; passing `null` would leak through as a string.
+      const adPayload: Record<string, unknown> = { prompt, format, templateId };
+      if (archetypeId) adPayload.archetypeId = archetypeId;
+
       const adRes = await fetch('/api/generate-ad', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, format, templateId }),
+        body: JSON.stringify(adPayload),
       });
 
       if (!adRes.ok) {

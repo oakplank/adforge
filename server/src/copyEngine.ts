@@ -1,4 +1,9 @@
 // Copy Engine - deterministic copy strategy with stronger CTA diversity.
+//
+// When an archetype is supplied, it overrides the default char limits,
+// caps headline voice to the archetype's allowed voice family, and lets
+// the caller opt into quote-style headlines (used by editorial-cause).
+import { getArchetype, type ArchetypeId, type ArchetypeDefinition } from './adArchetypes.js';
 
 type HeadlineFormula =
   | 'urgency'
@@ -18,6 +23,7 @@ interface CopyInput {
   category: string;
   objective?: Objective;
   rawPrompt?: string;
+  archetypeId?: ArchetypeId;
 }
 
 interface CopyOutput {
@@ -37,6 +43,28 @@ export const CHAR_LIMITS = {
   subhead: 72,
   cta: 18,
 } as const;
+
+// Headline voice → formula set mapping. The archetype picks a voice; we
+// only consider formulas that fit that voice. This is what makes a Luxury
+// ad never return "Today Only: 30% off" and a Sale ad never return
+// "What if ___ felt effortless?".
+const VOICE_TO_FORMULAS: Record<string, HeadlineFormula[]> = {
+  declarative: ['announcement', 'benefit', 'proof'],
+  poetic: ['curiosity', 'benefit', 'announcement'],
+  urgent: ['urgency', 'number', 'benefit'],
+  question: ['question', 'curiosity'],
+  editorial: ['announcement', 'curiosity', 'benefit'],
+  command: ['benefit', 'urgency', 'announcement'],
+  benefit: ['benefit', 'proof', 'number'],
+};
+
+function limitsFor(archetype: ArchetypeDefinition) {
+  return {
+    headline: archetype.copy.headlineMaxChars,
+    subhead: archetype.copy.subheadMaxChars,
+    cta: archetype.copy.ctaMaxChars,
+  };
+}
 
 function truncate(text: string, limit: number): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
@@ -101,6 +129,15 @@ function offerToken(offer?: string): string {
 }
 
 function formulaCandidates(input: CopyInput, objective: Objective): HeadlineFormula[] {
+  // When an explicit archetype is set, its headline voice drives formula
+  // selection — ignore category/vibe heuristics. The archetype is the
+  // deliberate choice; the rest is inference.
+  if (input.archetypeId && input.archetypeId !== 'general') {
+    const archetype = getArchetype(input.archetypeId);
+    const voice = archetype.copy.headlineVoice;
+    return VOICE_TO_FORMULAS[voice] ?? ['benefit', 'proof', 'curiosity'];
+  }
+
   const category = input.category.toLowerCase();
   const vibe = input.vibe.toLowerCase();
 
@@ -117,7 +154,14 @@ function formulaCandidates(input: CopyInput, objective: Objective): HeadlineForm
 
 function selectFormula(input: CopyInput): HeadlineFormula {
   const objective = objectiveFromInput(input);
-  const seed = hashSeed([input.product, input.offer ?? '', input.vibe, input.category, objective]);
+  const seed = hashSeed([
+    input.product,
+    input.offer ?? '',
+    input.vibe,
+    input.category,
+    objective,
+    input.archetypeId ?? 'general',
+  ]);
   return pickVariant(formulaCandidates(input, objective), seed);
 }
 
@@ -331,14 +375,31 @@ function compassionateCopy(input: CopyInput): CopyOutput {
   };
 }
 
+function applyCapitalization(text: string, mode: 'sentence' | 'title' | 'upper'): string {
+  if (!text) return text;
+  if (mode === 'upper') return text.toUpperCase();
+  if (mode === 'title') return toTitleCase(text);
+  // sentence case: capitalize only the first letter, rest unchanged.
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export function generateCopy(input: CopyInput): CopyOutput {
   if (isCompassionateContext(input)) {
     return compassionateCopy(input);
   }
 
+  const archetype = getArchetype(input.archetypeId);
+  const limits = limitsFor(archetype);
   const objective = objectiveFromInput(input);
   const formula = selectFormula(input);
-  const seed = hashSeed([input.product, input.offer ?? '', input.vibe, input.category, formula]);
+  const seed = hashSeed([
+    input.product,
+    input.offer ?? '',
+    input.vibe,
+    input.category,
+    formula,
+    archetype.id,
+  ]);
   let headline = generateHeadline(formula, input, seed);
   if (
     objective === 'offer' &&
@@ -348,24 +409,38 @@ export function generateCopy(input: CopyInput): CopyOutput {
     headline = `${offerToken(input.offer)} ${headline}`;
   }
 
-  headline = truncate(headline, CHAR_LIMITS.headline);
-  const subhead = truncate(generateSubhead(formula, input, seed), CHAR_LIMITS.subhead);
-  const cta = truncate(selectCta(input), CHAR_LIMITS.cta);
+  headline = applyCapitalization(headline, archetype.copy.capitalization);
+  if (archetype.copy.allowQuotes) {
+    // Editorial-cause wants pull-quote framing.
+    headline = `"${headline.replace(/^["']|["']$/g, '')}"`;
+  }
+  headline = truncate(headline, limits.headline);
+
+  const subhead = archetype.copy.subheadRequired
+    ? truncate(generateSubhead(formula, input, seed), limits.subhead)
+    : '';
+  const cta = truncate(selectCta(input), limits.cta);
 
   return { headline, subhead, cta, formula };
 }
 
-export function validateCopy(copy: CopyOutput): ValidationResult {
+// Validation tolerates both the legacy global limits (for callers that
+// don't pass an archetype) and archetype-specific limits when one is
+// supplied. Archetype limits are the strict source of truth when present.
+export function validateCopy(copy: CopyOutput, archetypeId?: ArchetypeId): ValidationResult {
   const errors: string[] = [];
+  const limits = archetypeId
+    ? limitsFor(getArchetype(archetypeId))
+    : { headline: CHAR_LIMITS.headline, subhead: CHAR_LIMITS.subhead, cta: CHAR_LIMITS.cta };
 
-  if (copy.headline.length > CHAR_LIMITS.headline) {
-    errors.push(`Headline exceeds ${CHAR_LIMITS.headline} characters (${copy.headline.length})`);
+  if (copy.headline.length > limits.headline) {
+    errors.push(`Headline exceeds ${limits.headline} characters (${copy.headline.length})`);
   }
-  if (copy.subhead.length > CHAR_LIMITS.subhead) {
-    errors.push(`Subhead exceeds ${CHAR_LIMITS.subhead} characters (${copy.subhead.length})`);
+  if (copy.subhead.length > limits.subhead) {
+    errors.push(`Subhead exceeds ${limits.subhead} characters (${copy.subhead.length})`);
   }
-  if (copy.cta.length > CHAR_LIMITS.cta) {
-    errors.push(`CTA exceeds ${CHAR_LIMITS.cta} characters (${copy.cta.length})`);
+  if (copy.cta.length > limits.cta) {
+    errors.push(`CTA exceeds ${limits.cta} characters (${copy.cta.length})`);
   }
 
   return { valid: errors.length === 0, errors };

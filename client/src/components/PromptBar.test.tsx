@@ -14,9 +14,44 @@ function renderPromptBar(onGenerated?: () => void) {
   );
 }
 
+// PromptBar mounts ArchetypeSelector, which fires `/api/archetypes`
+// on mount. This helper installs a route-aware fetch stub: archetype
+// calls resolve to an empty catalog; all other URLs walk the caller's
+// supplied route map. This keeps the intent of each test visible
+// (what the generate-ad / generate-image / generations calls return)
+// without having to shim the mount-time archetype fetch inline.
+function installRoutedFetch(routes: Record<string, Response | (() => Response | Promise<Response>)>) {
+  vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    const matchKey = Object.keys(routes).find((key) => url.includes(key));
+    if (matchKey === undefined) {
+      if (url.includes('/api/archetypes')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ archetypes: [] }), { status: 200 }),
+        );
+      }
+      return Promise.reject(new Error(`Unstubbed fetch to ${url}`));
+    }
+    const resolver = routes[matchKey];
+    const res = typeof resolver === 'function' ? resolver() : resolver;
+    return Promise.resolve(res);
+  });
+}
+
 describe('PromptBar', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    // Default archetypes stub so tests that don't call installRoutedFetch
+    // (smoke tests, validation tests, chip-render tests) still mount.
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/archetypes')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ archetypes: [] }), { status: 200 }),
+        );
+      }
+      return Promise.reject(new Error(`Unstubbed fetch to ${url}`));
+    });
   });
 
   it('renders prompt input and generate button', () => {
@@ -40,8 +75,6 @@ describe('PromptBar', () => {
   });
 
   it('calls ad/image APIs and persists generation history', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch');
-
     const adSpec = {
       imagePrompt: 'base creative brief',
       texts: { headline: 'H', subhead: 'S', cta: 'C' },
@@ -57,10 +90,18 @@ describe('PromptBar', () => {
       },
     };
 
-    fetchSpy
-      .mockResolvedValueOnce(new Response(JSON.stringify(adSpec), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ imageUrl: 'http://img.png' }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ generation: { id: 'gen-1' } }), { status: 201 }));
+    installRoutedFetch({
+      '/api/generate-ad': new Response(JSON.stringify(adSpec), { status: 200 }),
+      '/api/generate-image': new Response(
+        JSON.stringify({ imageUrl: 'http://img.png' }),
+        { status: 200 },
+      ),
+      '/api/generations': new Response(
+        JSON.stringify({ generation: { id: 'gen-1' } }),
+        { status: 201 },
+      ),
+    });
+    const fetchSpy = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
 
     const onGenerated = vi.fn();
     renderPromptBar(onGenerated);
@@ -68,14 +109,16 @@ describe('PromptBar', () => {
     fireEvent.change(screen.getByTestId('prompt-input'), { target: { value: 'summer sale shoes' } });
     fireEvent.click(screen.getByTestId('generate-button'));
 
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(3));
+    // ad + image + history + mount-time archetypes = 4 total
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(4));
 
-    expect(fetchSpy.mock.calls[0][0]).toBe('/api/generate-ad');
-    const adBody = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string);
+    const calls = fetchSpy.mock.calls.filter(([u]) => u !== '/api/archetypes');
+    expect(calls[0][0]).toBe('/api/generate-ad');
+    const adBody = JSON.parse(calls[0][1]?.body as string);
     expect(adBody.prompt).toBe('summer sale shoes');
 
-    expect(fetchSpy.mock.calls[1][0]).toBe('/api/generate-image');
-    const imageBody = JSON.parse(fetchSpy.mock.calls[1][1]?.body as string);
+    expect(calls[1][0]).toBe('/api/generate-image');
+    const imageBody = JSON.parse(calls[1][1]?.body as string);
     expect(imageBody.prompt).toBe('base creative brief');
     expect(imageBody.width).toBe(1080);
     expect(imageBody.height).toBe(1350);
@@ -83,8 +126,8 @@ describe('PromptBar', () => {
     expect(imageBody.systemPrompt).toBe('SYSTEM PROMPT');
     expect(imageBody.model).toBe('gemini-3-pro-image-preview');
 
-    expect(fetchSpy.mock.calls[2][0]).toBe('/api/generations');
-    const historyBody = JSON.parse(fetchSpy.mock.calls[2][1]?.body as string);
+    expect(calls[2][0]).toBe('/api/generations');
+    const historyBody = JSON.parse(calls[2][1]?.body as string);
     expect(historyBody.prompt).toBe('summer sale shoes');
     expect(historyBody.format).toBe('square');
     expect(historyBody.imagePrompt).toBe('base creative brief');
@@ -95,17 +138,17 @@ describe('PromptBar', () => {
   });
 
   it('disables generate button during loading', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch');
     let resolveAd!: (response: Response) => void;
-
-    fetchSpy
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveAd = resolve;
-          })
-      )
-      .mockResolvedValueOnce(new Response(JSON.stringify({ imageUrl: 'http://img.png' }), { status: 200 }));
+    installRoutedFetch({
+      '/api/generate-ad': () =>
+        new Promise<Response>((resolve) => {
+          resolveAd = resolve;
+        }),
+      '/api/generate-image': new Response(
+        JSON.stringify({ imageUrl: 'http://img.png' }),
+        { status: 200 },
+      ),
+    });
 
     renderPromptBar();
     fireEvent.change(screen.getByTestId('prompt-input'), { target: { value: 'test' } });
@@ -129,9 +172,12 @@ describe('PromptBar', () => {
   });
 
   it('shows generation error when API fails', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify({ error: 'Bad request' }), { status: 400 })
-    );
+    installRoutedFetch({
+      '/api/generate-ad': new Response(
+        JSON.stringify({ error: 'Bad request' }),
+        { status: 400 },
+      ),
+    });
 
     renderPromptBar();
     fireEvent.change(screen.getByTestId('prompt-input'), { target: { value: 'test' } });

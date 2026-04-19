@@ -12,6 +12,11 @@ import {
   generateLayout,
   type LayoutOutput,
 } from './layoutEngine.js';
+import {
+  AD_ARCHETYPES,
+  listArchetypes,
+  type ArchetypeId,
+} from './adArchetypes.js';
 
 const VIBE_COLOR_MAP: Record<string, { primary: string; secondary: string; accent: string }> = {
   energetic: { primary: '#FF6B00', secondary: '#FF9500', accent: '#FFD600' },
@@ -52,6 +57,7 @@ interface AdSpec {
   colors: AdColors;
   templateId: string;
   category: string;
+  archetypeId: ArchetypeId;
   layout?: LayoutOutput;
   metadata?: {
     objective: Objective;
@@ -133,12 +139,18 @@ export function parsePrompt(prompt: string): ParsedPrompt {
   return { product: product || 'product', offer, vibe, colors, rawPrompt: prompt };
 }
 
-export function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId?: string): AdSpec {
+export function generateAdSpec(
+  parsed: ParsedPrompt,
+  format?: string,
+  templateId?: string,
+  archetypeId?: ArchetypeId,
+): AdSpec {
   const { product, offer, vibe, colors, rawPrompt } = parsed;
   const resolvedFormat = format ?? 'square';
   const isPartingWordPrompt = /partingword|partingword\.com|parting word|end[\s-]?of[\s-]?life messaging/i.test(rawPrompt);
 
-  // 1. Build strategy and prompt pipeline
+  // 1. Build strategy and prompt pipeline (archetype shapes both the image
+  // system prompt and the render brief, and also biases copy selection).
   const strategy = buildPromptPipeline({
     rawPrompt,
     product,
@@ -147,9 +159,10 @@ export function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId
     format: resolvedFormat,
     colors,
     offer: offer || undefined,
+    archetypeId,
   });
 
-  // 2. Generate copy tied to objective and category
+  // 2. Generate copy tied to objective, category, and archetype voice.
   const copy = generateCopy({
     product,
     offer: offer || undefined,
@@ -157,9 +170,10 @@ export function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId
     category: strategy.category,
     objective: strategy.objective,
     rawPrompt,
+    archetypeId: strategy.archetypeId,
   });
 
-  const copyValidation = validateCopy(copy);
+  const copyValidation = validateCopy(copy, strategy.archetypeId);
   if (!copyValidation.valid) {
     console.warn('Copy validation warnings:', copyValidation.errors);
   }
@@ -205,6 +219,7 @@ export function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId
     colors: adColors,
     templateId: templateId ?? strategy.suggestedTemplateId,
     category: strategy.category,
+    archetypeId: strategy.archetypeId,
     layout,
     metadata: {
       objective: strategy.objective,
@@ -222,11 +237,25 @@ export function generateAdSpec(parsed: ParsedPrompt, format?: string, templateId
   };
 }
 
+function resolveArchetypeId(input: unknown): ArchetypeId | undefined {
+  if (typeof input !== 'string') return undefined;
+  const trimmed = input.trim();
+  if (!trimmed) return undefined;
+  // Only accept registered ids — anything else silently falls back to
+  // the default (general). This matters: a typo in a client payload
+  // shouldn't leak into prompts as an uncontrolled string.
+  return trimmed in AD_ARCHETYPES ? (trimmed as ArchetypeId) : undefined;
+}
+
 export function createGenerateAdRouter(): Router {
   const router = Router();
 
+  router.get('/api/archetypes', (_req: Request, res: Response) => {
+    res.json({ archetypes: listArchetypes() });
+  });
+
   router.post('/api/generate-ad', (req: Request, res: Response) => {
-    const { prompt, format, templateId } = req.body ?? {};
+    const { prompt, format, templateId, archetypeId } = req.body ?? {};
 
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
       res.status(400).json({ error: 'Missing or invalid prompt' });
@@ -235,10 +264,11 @@ export function createGenerateAdRouter(): Router {
 
     const safeFormat = typeof format === 'string' && format.trim().length > 0 ? format.trim() : undefined;
     const safeTemplateId = typeof templateId === 'string' && templateId.trim().length > 0 ? templateId.trim() : undefined;
+    const safeArchetypeId = resolveArchetypeId(archetypeId);
 
     try {
       const parsed = parsePrompt(prompt.trim());
-      const adSpec = generateAdSpec(parsed, safeFormat, safeTemplateId);
+      const adSpec = generateAdSpec(parsed, safeFormat, safeTemplateId, safeArchetypeId);
       res.json(adSpec);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to generate ad spec';

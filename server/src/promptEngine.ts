@@ -14,6 +14,11 @@ import {
   type ObjectiveStrategy,
   type StyleProfile,
 } from './promptEngineData.js';
+import {
+  getArchetype,
+  type ArchetypeDefinition,
+  type ArchetypeId,
+} from './adArchetypes.js';
 
 export {
   CATEGORY_CONFIGS,
@@ -228,8 +233,9 @@ function buildRenderPrompt(input: {
   colors?: string[];
   audience?: string;
   brand?: BrandProfile;
+  archetype: ArchetypeDefinition;
 }): string {
-  const { rawPrompt, product, description, formatConfig, colors, audience, brand } = input;
+  const { rawPrompt, product, description, formatConfig, colors, audience, brand, archetype } = input;
   void description;
 
   const userIntent = normalizeWhitespace(rawPrompt || description || product);
@@ -250,9 +256,17 @@ function buildRenderPrompt(input: {
     }
   }
 
+  const archetypeLabel =
+    archetype.id === 'general' ? 'modern ad' : archetype.label.toLowerCase();
+  const archetypeStyleBlock = archetype.image.styleDirectives.join(' ');
+  const avoidClause =
+    archetype.image.avoidList.length > 0
+      ? `Avoid: ${archetype.image.avoidList.join('; ')}.`
+      : '';
+
   return normalizeWhitespace(
     [
-      `Premium Instagram ad image, ${formatConfig.aspectRatio} aspect ratio, ${formatConfig.width}x${formatConfig.height}.`,
+      `${archetype.label} ad image for Instagram, ${formatConfig.aspectRatio} aspect ratio, ${formatConfig.width}x${formatConfig.height}.`,
       // Gemini 3 Pro Image has a tendency to letterbox/pillarbox when the
       // prompt reads as "cinematic." Explicit edge-to-edge guard blocks that.
       `Fill the entire ${formatConfig.aspectRatio} frame edge-to-edge with photographic content; absolutely no letterbox bars, pillarbox bars, matte borders, vignette frames, or solid color margins of any kind.`,
@@ -260,10 +274,17 @@ function buildRenderPrompt(input: {
       `Brief from the user: "${userIntent}"`,
       audienceClause,
       ...brandClauses,
+      // Archetype-specific visual direction — the core of the per-category
+      // system. This is what makes "Luxury" shoot like luxury and
+      // "Fitness" shoot like fitness even when the user's prompt is terse.
+      `This is a ${archetypeLabel} execution. ${archetypeStyleBlock}`,
+      `Lighting: ${archetype.image.lightingHint}.`,
+      `Composition: ${archetype.image.compositionHint}.`,
+      `Palette direction: ${archetype.image.paletteBias}.`,
       paletteClause,
+      avoidClause,
       // We intentionally do NOT reserve text safe zones anymore — forcing the
       // model to keep the top/bottom 20% empty was flattening compositions.
-      // The editor handles overlay legibility with scrims/shapes/contrast.
       // Editable overlays are added in post, so the model should not bake
       // typography into the pixels.
       'Do not render text, typography, captions, subtitles, logos, or watermarks inside the image — leave all copy for the overlay layer.',
@@ -274,14 +295,22 @@ function buildRenderPrompt(input: {
   );
 }
 
-function buildSystemPrompt(profile: StyleProfile, objective: Objective, brand?: BrandProfile): string {
+function buildSystemPrompt(
+  profile: StyleProfile,
+  objective: Objective,
+  archetype: ArchetypeDefinition,
+  brand?: BrandProfile,
+): string {
   const brandTone = brand
     ? `Brand tone for ${brand.name}: empathetic, dignified, trustworthy. Keep narrative logic consistent — one scene, one clear subject.`
     : 'Keep narrative logic consistent — one scene, one clear subject.';
 
   return normalizeWhitespace(
     [
-      'You are the creative director at a top-tier performance marketing agency producing platform-native paid social visuals.',
+      // Archetype-specific director framing replaces the generic "creative
+      // director at a top-tier agency" line. The user picked a category,
+      // so we speak in that category's voice.
+      archetype.image.systemPrompt,
       `Objective: ${objective}. Style: ${profile.name} (${profile.visualTone}).`,
       brandTone,
       // Keep the image clean of typography so the editor can layer real,
@@ -324,6 +353,7 @@ export function generateEnhancedPrompt(
   vibe: string,
   format: string,
   colors?: string[],
+  archetypeId?: ArchetypeId,
 ): {
   prompt: string;
   category: string;
@@ -336,6 +366,7 @@ export function generateEnhancedPrompt(
   const formatConfig = getFormatConfig(format);
   const textSafeZoneInstructions = generateTextSafeZoneInstructions(formatConfig);
   const mergedColors = withBrandPalette(colors, brand);
+  const archetype = getArchetype(archetypeId);
 
   return {
     prompt: buildRenderPrompt({
@@ -345,6 +376,7 @@ export function generateEnhancedPrompt(
       formatConfig,
       colors: mergedColors,
       brand,
+      archetype,
     }),
     category,
     formatConfig,
@@ -361,6 +393,7 @@ export function buildPromptPipeline(options: {
   colors?: string[];
   offer?: string;
   objective?: Objective;
+  archetypeId?: ArchetypeId;
 }): {
   category: string;
   objective: Objective;
@@ -370,6 +403,7 @@ export function buildPromptPipeline(options: {
   placementHints: PlacementPlanHints;
   agenticPlan: AgenticPlan;
   suggestedTemplateId: string;
+  archetypeId: ArchetypeId;
 } {
   const {
     rawPrompt,
@@ -380,6 +414,7 @@ export function buildPromptPipeline(options: {
     colors,
     offer,
     objective: preferredObjective,
+    archetypeId,
   } = options;
 
   const brand = detectBrandProfile(rawPrompt, description);
@@ -391,6 +426,7 @@ export function buildPromptPipeline(options: {
   const audience = inferAudience(description);
   const mergedColors = withBrandPalette(colors, brand);
   const qualityChecklist = buildQualityChecklist(formatConfig, objective, styleProfile, brand);
+  const archetype = getArchetype(archetypeId);
   // objectiveStrategy is resolved for future extensibility even if the slim
   // render prompt doesn't consume it directly.
   void resolveObjectiveStrategy(objective);
@@ -415,9 +451,17 @@ export function buildPromptPipeline(options: {
     colors: mergedColors,
     audience,
     brand,
+    archetype,
   });
 
-  const systemPrompt = buildSystemPrompt(styleProfile, objective, brand);
+  const systemPrompt = buildSystemPrompt(styleProfile, objective, archetype, brand);
+
+  // If the user explicitly picked an archetype, its suggested template wins
+  // over the heuristic template selection — they know what they're making.
+  const suggestedTemplateId =
+    archetype.id === 'general'
+      ? selectTemplateId(objective, category, vibe, brand)
+      : archetype.suggestedTemplateId;
 
   return {
     category,
@@ -435,7 +479,8 @@ export function buildPromptPipeline(options: {
     },
     placementHints: derivePlacementHints(objective, vibe, brand),
     agenticPlan: buildAgenticPlan(objective, category, styleProfile, brand),
-    suggestedTemplateId: selectTemplateId(objective, category, vibe, brand),
+    suggestedTemplateId,
+    archetypeId: archetype.id,
   };
 }
 

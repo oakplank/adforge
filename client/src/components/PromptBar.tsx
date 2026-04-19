@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useFormat } from '../context/FormatContext';
 import { useGeneration } from '../hooks/useGeneration';
 import { useGenerationState } from '../context/GenerationContext';
+import { ArchetypeSelector } from './ArchetypeSelector';
 
 interface PromptBarProps {
   onGenerated?: (result: NonNullable<ReturnType<typeof useGeneration>['result']>) => void;
@@ -18,7 +19,7 @@ export function PromptBar({ onGenerated }: PromptBarProps) {
   const [validationError, setValidationError] = useState<string | null>(null);
   const { format } = useFormat();
   const { isGenerating, error, generate } = useGeneration();
-  const { setIsGenerating } = useGenerationState();
+  const { setIsGenerating, selectedArchetypeId } = useGenerationState();
 
   async function handleGenerate() {
     setValidationError(null);
@@ -29,7 +30,12 @@ export function PromptBar({ onGenerated }: PromptBarProps) {
     }
 
     setIsGenerating(true);
-    const result = await generate(prompt.trim(), format.id);
+    const result = await generate(
+      prompt.trim(),
+      format.id,
+      undefined,
+      selectedArchetypeId,
+    );
     setIsGenerating(false);
 
     if (result && onGenerated) {
@@ -49,6 +55,8 @@ export function PromptBar({ onGenerated }: PromptBarProps) {
         <span className="shortcut-badge">⌘/Ctrl + Z: Undo</span>
         <span className="shortcut-badge">⌘/Ctrl + Shift + Z or Y: Redo</span>
       </div>
+
+      <ArchetypeSelector />
 
       <div className="prompt-input-row">
         <textarea
