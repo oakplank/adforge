@@ -2,13 +2,17 @@ import { useState } from 'react';
 import { useFormat } from '../context/FormatContext';
 import { useGeneration } from '../hooks/useGeneration';
 import { useGenerationState } from '../context/GenerationContext';
+import { useArchetypes } from '../hooks/useArchetypes';
 import { ArchetypeSelector } from './ArchetypeSelector';
 
 interface PromptBarProps {
   onGenerated?: (result: NonNullable<ReturnType<typeof useGeneration>['result']>) => void;
 }
 
-const QUICK_PROMPTS = [
+// Fallback chips when no archetype is selected and/or the server's
+// catalog hasn't loaded yet. The archetype catalog (once loaded)
+// ships its own per-category example prompts via useArchetypes().
+const FALLBACK_QUICK_PROMPTS = [
   'PartingWord.com end-of-life messaging platform launch, compassionate modern aesthetic, dark green and light cream beige palette.',
   'Weekend flash sale 30% off running shoes for city commuters, kinetic energy, black + orange.',
   'New skincare serum for sensitive skin, clean minimal vibe, soft blue and white palette.',
@@ -20,6 +24,18 @@ export function PromptBar({ onGenerated }: PromptBarProps) {
   const { format } = useFormat();
   const { isGenerating, error, generate } = useGeneration();
   const { setIsGenerating, selectedArchetypeId } = useGenerationState();
+  const { archetypes } = useArchetypes();
+
+  // When a category is active, surface that category's example prompts.
+  // Otherwise fall back to the generic FALLBACK_QUICK_PROMPTS trio.
+  // This is what makes the selector feel useful: pick "Luxury" and the
+  // chips update to show luxury-shaped prompts, not a sale-shoes chip.
+  const activeExamples = selectedArchetypeId
+    ? archetypes.find((a) => a.id === selectedArchetypeId)?.examplePrompts
+    : undefined;
+  const quickPrompts = activeExamples && activeExamples.length > 0
+    ? activeExamples
+    : FALLBACK_QUICK_PROMPTS;
 
   async function handleGenerate() {
     setValidationError(null);
@@ -96,8 +112,8 @@ export function PromptBar({ onGenerated }: PromptBarProps) {
         </button>
       </div>
 
-      <div className="prompt-chip-row">
-        {QUICK_PROMPTS.map((quickPrompt) => (
+      <div className="prompt-chip-row" data-testid="prompt-chip-row">
+        {quickPrompts.map((quickPrompt) => (
           <button
             key={quickPrompt}
             type="button"

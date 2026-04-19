@@ -99,6 +99,11 @@ export interface ArchetypeDefinition {
   // Suggested template on the overlay side. Useful hint for
   // layoutEngine / CopySuggestions defaults.
   suggestedTemplateId: 'minimal' | 'bold-sale' | 'product-showcase';
+  // Two to three example prompts the picker surfaces once the user
+  // selects this archetype. Kept concrete and specific — the whole
+  // point is to show *what a great prompt in this category looks like*,
+  // so users don't fall back to "make me a cool ad."
+  examplePrompts: string[];
 }
 
 // ---------- Definitions ----------
@@ -142,6 +147,11 @@ const GENERAL: ArchetypeDefinition = {
     background: '#0C1118',
   },
   suggestedTemplateId: 'minimal',
+  examplePrompts: [
+    'Weekend flash sale 30% off running shoes for city commuters, kinetic energy, black and orange.',
+    'New skincare serum for sensitive skin, clean minimal vibe, soft blue and white palette.',
+    'PartingWord.com end-of-life messaging platform launch, compassionate modern aesthetic, dark green and cream.',
+  ],
 };
 
 const PRODUCT_LAUNCH: ArchetypeDefinition = {
@@ -183,6 +193,11 @@ const PRODUCT_LAUNCH: ArchetypeDefinition = {
     background: '#0B0F19',
   },
   suggestedTemplateId: 'product-showcase',
+  examplePrompts: [
+    'Introducing Field Notes, a matte-ceramic coffee pour-over for home kitchens. Launch in warm neutrals.',
+    'New noise-cancelling headphones with brushed titanium and leather — confident minimal launch shot.',
+    'Meet Atlas, our first plant-based protein bar. Hero the bar on a linen surface with soft side light.',
+  ],
 };
 
 const SALE_OFFER: ArchetypeDefinition = {
@@ -223,6 +238,11 @@ const SALE_OFFER: ArchetypeDefinition = {
     background: '#0A0A0A',
   },
   suggestedTemplateId: 'bold-sale',
+  examplePrompts: [
+    'Flash sale 40% off running shoes this weekend only, high contrast red and black with yellow accent.',
+    'Buy one get one free on winter jackets, urgent energetic feel, punchy saturated color.',
+    '$50 off premium wireless headphones — last call offer, diagonal composition, bold graphic block.',
+  ],
 };
 
 const LUXURY: ArchetypeDefinition = {
@@ -264,6 +284,11 @@ const LUXURY: ArchetypeDefinition = {
     background: '#0F0E0C',
   },
   suggestedTemplateId: 'minimal',
+  examplePrompts: [
+    'Hand-forged 18k gold band on brushed stone, low window light, editorial jewelry cover feel.',
+    'Cashmere overcoat draped on a linen chair in a quiet room, muted neutrals, north-window light.',
+    'Single crystal perfume bottle on marble with soft shadow, expensive and quiet, no extra props.',
+  ],
 };
 
 const FOOD_BEVERAGE: ArchetypeDefinition = {
@@ -305,6 +330,11 @@ const FOOD_BEVERAGE: ArchetypeDefinition = {
     background: '#1A120B',
   },
   suggestedTemplateId: 'product-showcase',
+  examplePrompts: [
+    'Fresh sourdough loaf torn open, steam rising, linen napkin and wooden board, warm side light.',
+    'Iced coffee with condensation on a terrazzo counter, a hand reaching in, summer morning light.',
+    'Neapolitan pizza with leopard-spot crust and melting mozzarella, overhead view, just out of the oven.',
+  ],
 };
 
 const BEAUTY_SKINCARE: ArchetypeDefinition = {
@@ -346,6 +376,11 @@ const BEAUTY_SKINCARE: ArchetypeDefinition = {
     background: '#EDE4DA',
   },
   suggestedTemplateId: 'minimal',
+  examplePrompts: [
+    'Hydrating serum for sensitive skin, clean glass dropper on pale celadon, water-soft atmosphere.',
+    'Matte ceramic sunscreen stick on a travertine shelf, soft diffused daylight, blush and bone palette.',
+    'Niacinamide toner bottle beside a single fresh fig, no florals, quiet cream-and-blush palette.',
+  ],
 };
 
 const TECH_SAAS: ArchetypeDefinition = {
@@ -387,6 +422,11 @@ const TECH_SAAS: ArchetypeDefinition = {
     background: '#060A13',
   },
   suggestedTemplateId: 'product-showcase',
+  examplePrompts: [
+    'A productivity app that plans your day, shown as folded paper planes on a cast plaster desk, electric blue accent.',
+    'Team collaboration tool as three acrylic panels interlocking on charcoal, precise studio edge light.',
+    'Cloud infrastructure platform as a stack of brushed aluminum blocks, single chartreuse accent, graphic negative space.',
+  ],
 };
 
 const FITNESS_ATHLETIC: ArchetypeDefinition = {
@@ -428,6 +468,11 @@ const FITNESS_ATHLETIC: ArchetypeDefinition = {
     background: '#050505',
   },
   suggestedTemplateId: 'bold-sale',
+  examplePrompts: [
+    'Trail runner mid-stride on wet asphalt before dawn, sweat visible, cold hard light, electric green accent.',
+    'Weightlifter chalking hands in a concrete gym, asymmetric tense posture, hard side light.',
+    'Boxing gloves resting on a heavy bag, torn wraps, single low light, near-black frame with red accent.',
+  ],
 };
 
 const TRAVEL_HOSPITALITY: ArchetypeDefinition = {
@@ -469,6 +514,11 @@ const TRAVEL_HOSPITALITY: ArchetypeDefinition = {
     background: '#1C120A',
   },
   suggestedTemplateId: 'minimal',
+  examplePrompts: [
+    'Boutique hotel courtyard in Oaxaca at golden hour, a single figure in linen, warm terracotta palette.',
+    'Sleeper train window over alpine fog at dawn, steam visible, muted teal and amber.',
+    'Stone harbor in Puglia at dusk, fishing boat in the foreground, soft indigo sky with warm lamp glow.',
+  ],
 };
 
 const EDITORIAL_CAUSE: ArchetypeDefinition = {
@@ -510,6 +560,11 @@ const EDITORIAL_CAUSE: ArchetypeDefinition = {
     background: '#0C1118',
   },
   suggestedTemplateId: 'minimal',
+  examplePrompts: [
+    'Scholarship fund for first-generation college students, portrait in a library, honest quiet tone.',
+    'Mental health awareness campaign, woman by a kitchen window, real light, space for a pull-quote headline.',
+    'Clean water nonprofit in rural Kenya, a grandmother and grandchild at a new pump, dignified midday light.',
+  ],
 };
 
 // ---------- Registry ----------
@@ -546,14 +601,22 @@ export function getArchetype(id: string | undefined): ArchetypeDefinition {
   return candidate ?? GENERAL;
 }
 
-// Public listing used by the /api/archetypes endpoint.
+// Public listing used by the /api/archetypes endpoint. Includes the
+// per-archetype example prompts so the client picker can surface them
+// as contextual quick-prompt chips.
 export function listArchetypes(): Array<{
   id: ArchetypeId;
   label: string;
   description: string;
+  examplePrompts: string[];
 }> {
   return ARCHETYPE_PICKER_ORDER.map((id) => {
     const a = AD_ARCHETYPES[id];
-    return { id: a.id, label: a.label, description: a.description };
+    return {
+      id: a.id,
+      label: a.label,
+      description: a.description,
+      examplePrompts: a.examplePrompts,
+    };
   });
 }

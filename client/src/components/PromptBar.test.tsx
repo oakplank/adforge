@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { PromptBar } from './PromptBar';
 import { FormatProvider } from '../context/FormatContext';
 import { GenerationProvider } from '../context/GenerationContext';
+import { __resetArchetypesCacheForTests } from '../hooks/useArchetypes';
 
 function renderPromptBar(onGenerated?: () => void) {
   return render(
@@ -41,6 +42,7 @@ function installRoutedFetch(routes: Record<string, Response | (() => Response | 
 describe('PromptBar', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    __resetArchetypesCacheForTests();
     // Default archetypes stub so tests that don't call installRoutedFetch
     // (smoke tests, validation tests, chip-render tests) still mount.
     vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
@@ -188,9 +190,62 @@ describe('PromptBar', () => {
     });
   });
 
-  it('renders quick prompt chips', () => {
+  it('renders fallback quick prompt chips when no archetype is selected', () => {
     renderPromptBar();
     expect(screen.getByText(/flash sale 30% off running shoes/i)).toBeInTheDocument();
     expect(screen.getByText(/new skincare serum/i)).toBeInTheDocument();
+  });
+
+  it("swaps chips to the selected archetype's example prompts", async () => {
+    // Route the archetype catalog to include example prompts so the
+    // selector can light up with them.
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/archetypes')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              archetypes: [
+                {
+                  id: 'luxury',
+                  label: 'Luxury / Premium',
+                  description: 'Editorial brief.',
+                  examplePrompts: [
+                    'Muted editorial still life of a hand-forged ring.',
+                    'Cashmere overcoat draped on a linen chair, quiet room.',
+                  ],
+                },
+              ],
+            }),
+            { status: 200 },
+          ),
+        );
+      }
+      return Promise.reject(new Error(`Unstubbed fetch to ${url}`));
+    });
+
+    renderPromptBar();
+
+    // Before picking a category, fallback chips are visible.
+    await waitFor(() => {
+      expect(screen.getByText(/flash sale 30% off running shoes/i)).toBeInTheDocument();
+    });
+
+    // Pick luxury -> chips swap to the archetype's examples.
+    await waitFor(() => {
+      expect(screen.getByTestId('archetype-chip-luxury')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('archetype-chip-luxury'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/hand-forged ring/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/flash sale 30% off running shoes/i)).not.toBeInTheDocument();
+
+    // And the back-to-Auto chip restores the fallback.
+    fireEvent.click(screen.getByTestId('archetype-chip-auto'));
+    await waitFor(() => {
+      expect(screen.getByText(/flash sale 30% off running shoes/i)).toBeInTheDocument();
+    });
   });
 });

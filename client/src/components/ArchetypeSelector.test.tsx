@@ -2,11 +2,27 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ArchetypeSelector } from './ArchetypeSelector';
 import { GenerationProvider, useGenerationState } from '../context/GenerationContext';
+import { __resetArchetypesCacheForTests } from '../hooks/useArchetypes';
 
 const archetypes = [
-  { id: 'product-launch', label: 'Product Launch', description: 'Launch brief.' },
-  { id: 'sale-offer', label: 'Sale / Offer', description: 'Urgency brief.' },
-  { id: 'luxury', label: 'Luxury / Premium', description: 'Editorial brief.' },
+  {
+    id: 'product-launch',
+    label: 'Product Launch',
+    description: 'Launch brief.',
+    examplePrompts: ['Launch example A prompt here for testing.'],
+  },
+  {
+    id: 'sale-offer',
+    label: 'Sale / Offer',
+    description: 'Urgency brief.',
+    examplePrompts: ['Sale example prompt for a red-and-black flash offer.'],
+  },
+  {
+    id: 'luxury',
+    label: 'Luxury / Premium',
+    description: 'Editorial brief.',
+    examplePrompts: ['Luxury example prompt for a muted editorial still life.'],
+  },
 ];
 
 function mockArchetypesFetch() {
@@ -25,6 +41,7 @@ function SelectedProbe() {
 describe('ArchetypeSelector', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    __resetArchetypesCacheForTests();
   });
 
   it('renders an Auto chip plus fetched archetypes', async () => {

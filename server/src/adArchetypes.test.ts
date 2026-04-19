@@ -46,6 +46,24 @@ describe('adArchetypes registry', () => {
       expect(a.copy.ctaMaxChars).toBeGreaterThan(5);
     }
   });
+
+  it('every archetype ships at least two concrete example prompts', () => {
+    for (const a of Object.values(AD_ARCHETYPES)) {
+      expect(a.examplePrompts.length).toBeGreaterThanOrEqual(2);
+      for (const prompt of a.examplePrompts) {
+        // Examples should be full sentences, not placeholder stubs.
+        expect(prompt.length).toBeGreaterThan(30);
+      }
+    }
+  });
+
+  it('listArchetypes includes examplePrompts for each entry', () => {
+    const list = listArchetypes();
+    for (const entry of list) {
+      expect(Array.isArray(entry.examplePrompts)).toBe(true);
+      expect(entry.examplePrompts.length).toBeGreaterThan(0);
+    }
+  });
 });
 
 describe('archetype-driven render prompt', () => {
