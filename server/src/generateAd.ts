@@ -14,6 +14,7 @@ import {
 } from './layoutEngine.js';
 import {
   AD_ARCHETYPES,
+  getArchetype,
   listArchetypes,
   type ArchetypeId,
 } from './adArchetypes.js';
@@ -178,14 +179,29 @@ export function generateAdSpec(
     console.warn('Copy validation warnings:', copyValidation.errors);
   }
 
-  // 3. Resolve colors
+  // 3. Resolve colors.
+  //
+  // Priority chain (most specific -> least specific):
+  //   1. Explicit colors named by the user in the prompt ("orange and black")
+  //   2. The selected archetype's defaultPalette (when a non-general
+  //      archetype is picked — e.g. Luxury wants cream/ink, Sale wants
+  //      red/black, Fitness wants near-black/green)
+  //   3. The legacy vibe color map, which pre-dates archetypes
+  //
+  // This is what makes the archetype picker actually change the rendered
+  // ad palette: without this wiring, defaultPalette was dead data.
   const vibeColors = VIBE_COLOR_MAP[vibe] ?? VIBE_COLOR_MAP.energetic;
+  const archetype = getArchetype(strategy.archetypeId);
+  const archetypePalette =
+    archetype.id === 'general' ? undefined : archetype.defaultPalette;
   const adColors: AdColors = {
-    primary: colors[0] ?? vibeColors.primary,
-    secondary: colors[1] ?? vibeColors.secondary,
-    accent: vibeColors.accent,
-    text: '#F7F7F2',
-    background: vibe === 'minimal' || vibe === 'calm' ? '#12151C' : '#151922',
+    primary: colors[0] ?? archetypePalette?.primary ?? vibeColors.primary,
+    secondary: colors[1] ?? archetypePalette?.secondary ?? vibeColors.secondary,
+    accent: archetypePalette?.accent ?? vibeColors.accent,
+    text: archetypePalette?.text ?? '#F7F7F2',
+    background:
+      archetypePalette?.background ??
+      (vibe === 'minimal' || vibe === 'calm' ? '#12151C' : '#151922'),
   };
 
   if (isPartingWordPrompt) {

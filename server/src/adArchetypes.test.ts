@@ -7,6 +7,7 @@ import {
 } from './adArchetypes.js';
 import { buildPromptPipeline } from './promptEngine.js';
 import { generateCopy } from './copyEngine.js';
+import { generateAdSpec, parsePrompt } from './generateAd.js';
 
 describe('adArchetypes registry', () => {
   it('includes general and all picker-order archetypes', () => {
@@ -178,6 +179,39 @@ describe('archetype-driven copy', () => {
     expect(copy.headline.length).toBeLessThanOrEqual(36);
     expect(copy.subhead.length).toBeLessThanOrEqual(72);
     expect(copy.cta.length).toBeLessThanOrEqual(18);
+  });
+});
+
+describe('archetype palette wiring', () => {
+  it('picks the archetype defaultPalette accent over the vibe map', () => {
+    const parsed = parsePrompt('new dive watch');
+    const spec = generateAdSpec(parsed, 'square', undefined, 'luxury');
+    // Luxury archetype accent is brushed gold.
+    expect(spec.colors.accent).toBe('#C9A84C');
+    expect(spec.colors.background).toBe('#0F0E0C');
+  });
+
+  it('user-named colors in the prompt still override the archetype palette', () => {
+    // Explicit "red and black" should beat the luxury cream/ink defaults.
+    const parsed = parsePrompt('red and black luxury watch');
+    const spec = generateAdSpec(parsed, 'square', undefined, 'luxury');
+    expect(spec.colors.primary).toBe('#D32F2F');
+    expect(spec.colors.secondary).toBe('#212121');
+  });
+
+  it('general archetype still uses the legacy vibe palette', () => {
+    const parsed = parsePrompt('premium cookware');
+    const spec = generateAdSpec(parsed, 'square');
+    // Background should match the legacy non-minimal vibe default.
+    expect(spec.colors.background).toBe('#151922');
+  });
+
+  it('sale-offer archetype yields its high-contrast red/black palette', () => {
+    const parsed = parsePrompt('flash sale');
+    const spec = generateAdSpec(parsed, 'square', undefined, 'sale-offer');
+    expect(spec.colors.primary).toBe('#DC2626');
+    expect(spec.colors.secondary).toBe('#111111');
+    expect(spec.colors.accent).toBe('#FACC15');
   });
 });
 
