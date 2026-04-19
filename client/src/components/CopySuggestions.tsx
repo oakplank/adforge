@@ -46,6 +46,45 @@ function ctaTextSize(canvasWidth: number): number {
   return Math.min(52, Math.max(18, scaled));
 }
 
+// Extract the first concrete face from a CSS font-family stack so we can
+// ask the browser's font loader to wait for it. Stacks look like
+//   '"Playfair Display", Georgia, serif'
+// and we want `Playfair Display`. If we can't find a quoted name, return
+// the first token; if that's a generic family (serif / sans-serif) we
+// return null and skip the font-load wait — the fallback is fine.
+function primaryFontName(stack: string): string | null {
+  const first = stack.split(',')[0]?.trim();
+  if (!first) return null;
+  const unquoted = first.replace(/^["']|["']$/g, '').trim();
+  if (!unquoted) return null;
+  if (/^(serif|sans-serif|monospace|cursive|fantasy|system-ui)$/i.test(unquoted)) {
+    return null;
+  }
+  return unquoted;
+}
+
+// Best-effort: wait for the primary face in the stack to be ready before
+// we let Fabric measure text. Without this, IText measures in the fallback
+// font and then visually snaps to the archetype face once it loads, which
+// looks janky — and also leaves the CTA pill sized for the wrong width.
+// We race against a short timeout so a flaky font load can't block an
+// insert indefinitely.
+async function waitForFont(stack: string, weight: 'normal' | 'bold', sizePx: number): Promise<void> {
+  const name = primaryFontName(stack);
+  if (!name) return;
+  const fonts = typeof document !== 'undefined' ? document.fonts : undefined;
+  if (!fonts || typeof fonts.load !== 'function') return;
+  try {
+    const spec = `${weight} ${sizePx}px "${name}"`;
+    await Promise.race([
+      fonts.load(spec),
+      new Promise((resolve) => setTimeout(resolve, 400)),
+    ]);
+  } catch {
+    // Never block the insert on a font-load failure.
+  }
+}
+
 export function CopySuggestions({ canvas }: CopySuggestionsProps) {
   const { lastAdSpec } = useGenerationState();
   const addLayer = useLayerStore((s) => s.addLayer);
@@ -64,7 +103,7 @@ export function CopySuggestions({ canvas }: CopySuggestionsProps) {
   const bodyFont = lastAdSpec?.fonts?.body || DEFAULT_FONT;
 
   const insertText = useCallback(
-    (kind: CopyKind) => {
+    async (kind: CopyKind) => {
       if (!canvas) return;
       const canvasWidth = canvas.width ?? 1080;
       const canvasHeight = canvas.height ?? 1080;
@@ -80,6 +119,14 @@ export function CopySuggestions({ canvas }: CopySuggestionsProps) {
 
       const left = canvasWidth / 2;
       const top = canvasHeight * verticalBias;
+
+      // Make sure the archetype face is loaded before Fabric measures the
+      // text — otherwise the pill width and vertical placement are computed
+      // for the fallback font and then snap when the face arrives.
+      const stack = kind === 'headline' ? displayFont : bodyFont;
+      const weight: 'bold' | 'normal' =
+        kind === 'cta' || kind === 'headline' ? 'bold' : 'normal';
+      await waitForFont(stack, weight, fontSize);
 
       // Sample under the intended drop region to pick contrast.
       const sampleRect = {

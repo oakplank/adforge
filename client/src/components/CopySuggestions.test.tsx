@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useEffect, type ReactNode } from 'react';
 import { GenerationProvider, useGenerationState } from '../context/GenerationContext';
 import { CopySuggestions } from './CopySuggestions';
@@ -104,7 +104,7 @@ describe('CopySuggestions', () => {
     );
   });
 
-  it('inserts a pre-styled headline layer when clicked', () => {
+  it('inserts a pre-styled headline layer when clicked', async () => {
     const canvas = makeCanvas();
     render(
       <GenerationProvider>
@@ -116,7 +116,7 @@ describe('CopySuggestions', () => {
 
     fireEvent.click(screen.getByTestId('copy-chip-headline'));
 
-    expect(canvas.add).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(canvas.add).toHaveBeenCalledTimes(1));
     const added = canvas.add.mock.calls[0][0];
     expect(added.text).toBe('Run the city');
     expect(added.fontWeight).toBe('bold');
@@ -128,7 +128,7 @@ describe('CopySuggestions', () => {
     expect(layers[0].name).toBe('Headline');
   });
 
-  it('inserts a CTA as a grouped pill using the accent color', () => {
+  it('inserts a CTA as a grouped pill using the accent color', async () => {
     const canvas = makeCanvas();
     render(
       <GenerationProvider>
@@ -140,7 +140,7 @@ describe('CopySuggestions', () => {
 
     fireEvent.click(screen.getByTestId('copy-chip-cta'));
 
-    expect(canvas.add).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(canvas.add).toHaveBeenCalledTimes(1));
     const added = canvas.add.mock.calls[0][0];
     expect(added.type).toBe('group');
     const pill = added.children[0];
@@ -161,7 +161,7 @@ describe('CopySuggestions', () => {
     expect(screen.getByTestId('copy-chip-headline')).toBeDisabled();
   });
 
-  it('uses archetype display font for the inserted headline', () => {
+  it('uses archetype display font for the inserted headline', async () => {
     // When the adSpec ships an archetype font stack, the inserted IText
     // layer must pick that up — otherwise the "pick luxury, see serif"
     // promise silently breaks.
@@ -183,11 +183,12 @@ describe('CopySuggestions', () => {
     );
 
     fireEvent.click(screen.getByTestId('copy-chip-headline'));
+    await waitFor(() => expect(canvas.add).toHaveBeenCalledTimes(1));
     const added = canvas.add.mock.calls[0][0];
     expect(added.fontFamily).toBe('"Playfair Display", Georgia, serif');
   });
 
-  it('uses archetype body font for subhead + CTA inserts', () => {
+  it('uses archetype body font for subhead + CTA inserts', async () => {
     const saleSpec: AdSpec = {
       ...testAdSpec,
       archetypeId: 'sale-offer',
@@ -206,16 +207,18 @@ describe('CopySuggestions', () => {
     );
 
     fireEvent.click(screen.getByTestId('copy-chip-subhead'));
+    await waitFor(() => expect(canvas.add).toHaveBeenCalledTimes(1));
     const subheadObj = canvas.add.mock.calls[0][0];
     expect(subheadObj.fontFamily).toBe('"Inter", Arial, sans-serif');
 
     fireEvent.click(screen.getByTestId('copy-chip-cta'));
+    await waitFor(() => expect(canvas.add).toHaveBeenCalledTimes(2));
     const ctaGroup = canvas.add.mock.calls[1][0];
     // CTA text is the second child of the group (pill first).
     expect(ctaGroup.children[1].fontFamily).toBe('"Inter", Arial, sans-serif');
   });
 
-  it('falls back to Space Grotesk when the spec has no fonts (pre-archetype generations)', () => {
+  it('falls back to Space Grotesk when the spec has no fonts (pre-archetype generations)', async () => {
     // Generations saved before the font field shipped must still insert
     // legibly — we fall back to the original hardcoded default.
     const canvas = makeCanvas();
@@ -228,6 +231,7 @@ describe('CopySuggestions', () => {
     );
 
     fireEvent.click(screen.getByTestId('copy-chip-headline'));
+    await waitFor(() => expect(canvas.add).toHaveBeenCalledTimes(1));
     const added = canvas.add.mock.calls[0][0];
     expect(added.fontFamily).toContain('Space Grotesk');
   });

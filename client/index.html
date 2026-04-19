@@ -4,6 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AdForge</title>
+    <!--
+      Per-archetype font stacks (see server/src/adArchetypes.ts) resolve to
+      these Google Fonts first, then fall back to web-safe families. Loading
+      them here means picking Luxury actually renders the inserted headline
+      in Playfair Display instead of Georgia, and Sale/Offer lands in Anton
+      instead of Impact. `display=swap` keeps the UI responsive — fallback
+      renders first, then swaps when the face arrives.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Anton&family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Serif+Display&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=Oswald:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    />
   </head>
   <body class="bg-gray-950 text-white">
     <div id="root"></div>
